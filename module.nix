@@ -87,12 +87,23 @@ let
   userHome = "/Users/${user}";
 
   sudoKanataWrapper = pkgs.writeScript "sudo-kanata" (if cfg.sudoers then ''
-    #!/bin/sh
+    #!/bin/bash
     /usr/bin/sudo /usr/bin/pkill -x kanata 2>/dev/null
-    exec /usr/bin/sudo ${cfg.package}/bin/kanata "$@"
+    /usr/bin/sudo ${cfg.package}/bin/kanata "$@" &
+    KANATA_PID=$!
+    # Monitor: when this wrapper is killed (SIGKILL from kanata-tray),
+    # detect death via kill -0 and clean up kanata.
+    (while kill -0 $$ 2>/dev/null; do sleep 0.5; done
+     /usr/bin/sudo /usr/bin/pkill -x kanata 2>/dev/null) &
+    wait $KANATA_PID
   '' else ''
-    #!/bin/sh
-    exec /usr/bin/sudo /bin/sh -c '/usr/bin/pkill -x kanata 2>/dev/null; exec ${cfg.package}/bin/kanata "$@"' -- "$@"
+    #!/bin/bash
+    /usr/bin/sudo /bin/sh -c '/usr/bin/pkill -x kanata 2>/dev/null; exec ${cfg.package}/bin/kanata "$@"' -- "$@" &
+    KANATA_PID=$!
+    # Monitor: when wrapper is killed, prompt user to authenticate and kill kanata.
+    (while kill -0 $$ 2>/dev/null; do sleep 0.5; done
+     /usr/bin/osascript -e 'do shell script "/usr/bin/pkill -x kanata" with administrator privileges' 2>/dev/null) &
+    wait $KANATA_PID
   '');
 
   kanata-icon = pkgs.fetchurl {
@@ -168,11 +179,11 @@ in
 
     sudoers = lib.mkOption {
       type = lib.types.bool;
-      default = cfg.mode == "daemon";
+      default = true;
       description = ''
         Add NOPASSWD sudoers entry for kanata.
-        Defaults to `true` for daemon mode (avoids fragile TCC sqlite3 hack),
-        `false` for tray mode (user authenticates via TouchID/password).
+        Defaults to `true`. Required for clean process termination in tray mode
+        and to avoid the fragile TCC sqlite3 hack in daemon mode.
       '';
     };
 

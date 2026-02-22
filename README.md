@@ -48,7 +48,7 @@ All options are under `services.kanata`.
 |---|---|---|---|
 | `enable` | bool | `false` | Enable kanata with Karabiner DriverKit |
 | `mode` | `"daemon"` \| `"tray"` | `"tray"` | Launch mode (see below) |
-| `sudoers` | bool | `true` for daemon, `false` for tray | Add NOPASSWD sudoers entry |
+| `sudoers` | bool | `true` | Add NOPASSWD sudoers entry |
 | `user` | string | `system.primaryUser` | Username for file paths, sudoers, and user agents |
 | `configFile` | string | `~/Library/Application Support/kanata/kanata.kbd` | Path to kanata config |
 | `configSource` | path \| null | `null` | If set, `configFile` is symlinked to this path |
@@ -66,8 +66,8 @@ The `mode` and `sudoers` options combine into four configurations:
 
 | mode | sudoers | How it works |
 |---|---|---|
-| `tray` | `false` (default) | kanata-tray launches kanata via sudo; prompts for TouchID/password each start |
-| `tray` | `true` | Same, but with NOPASSWD — no prompts |
+| `tray` | `true` (default) | kanata-tray launches kanata via sudo NOPASSWD — no prompts |
+| `tray` | `false` | Prompts for TouchID/password on start; password dialog on stop |
 | `daemon` | `true` (default) | Headless user launchd agent via sudo NOPASSWD; one-time TCC dialog |
 | `daemon` | `false` | Root launchd daemon with TCC sqlite3 hack (fragile, not recommended) |
 
