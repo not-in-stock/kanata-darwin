@@ -55,7 +55,9 @@ All options are under `services.kanata`.
 | `package` | package | `pkgs.kanata-with-cmd` | The kanata package |
 | `tray.package` | package | from kanata-tray flake | The kanata-tray package |
 | `tray.autostart` | bool | `true` | Create a launchd agent to start kanata-tray at login |
-| `tray.icons` | attrsOf path | `{}` | Map of layer names to icon files (PNG), shown in menu bar |
+| `tray.icons.labels` | attrsOf string | `{}` | Map of layer names to text labels or font glyphs; generates menu bar icons |
+| `tray.icons.font` | package | `pkgs.liberation_ttf` | Font package for generated icons (e.g. Nerd Fonts) |
+| `tray.icons.files` | attrsOf path | `{}` | Custom icon files (override generated for same layer) |
 | `tray.settings` | TOML attrs | `{}` | Extra settings merged into `kanata-tray.toml` |
 
 ## Modes
@@ -81,6 +83,38 @@ On the first `darwin-rebuild switch`, macOS will show a system dialog asking to 
 </p>
 
 Click **"Open System Settings"** to navigate to the driver extension activation page. Do not click "OK" - it will dismiss the dialog without activating the extension.
+
+## Layer icons
+
+The module can generate menu bar icons for kanata-tray from text labels. Icons are rendered as white rounded rectangles with the label cut out (transparent). Each glyph is automatically scaled to fill the icon area.
+
+Simple letters:
+
+```nix
+services.kanata.tray.icons.labels = {
+  default = "K";
+  nav = "N";
+};
+```
+
+Glyphs - use the `U+XXXX` codepoint syntax so labels stay readable in any editor:
+
+```nix
+services.kanata.tray.icons = {
+  font = pkgs.nerd-fonts.sauce-code-pro;
+  labels = {
+    default = "U+F0B34"; # nf-md-format_letter_case (Aa)
+    nav = "U+F062";      # nf-fa-arrow_up
+    sym = "U+EA8B";      # nf-cod-symbol_namespace ({})
+    num = "U+F03A0";     # nf-md-numeric (123)
+    fun = "U+F0295";     # nf-md-function (ƒ)
+  };
+};
+```
+
+Labels matching `U+XXXX` are automatically converted to the corresponding Unicode character during icon generation.
+
+You can also provide pre-made icon files via `tray.icons.files`, which take priority over generated ones for the same layer name.
 
 ## Tips
 

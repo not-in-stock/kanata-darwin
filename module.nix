@@ -16,9 +16,58 @@ let
   karabiner-driver-version = "6.10.0";
 
   tomlFormat = pkgs.formats.toml { };
+
+  # Generate icons from labels using imagemagick (tray mode only)
+  generatedIcons = lib.optionalAttrs (cfg.mode == "tray" && cfg.tray.icons.labels != { }) (
+    let
+      iconsPkg = pkgs.runCommand "kanata-layer-icons"
+        { nativeBuildInputs = [ pkgs.imagemagick cfg.tray.icons.font ]; }
+        ''
+          mkdir -p $out
+          FONT=$(find ${cfg.tray.icons.font} -name '*.ttf' -o -name '*.otf' | head -1)
+          if [ -z "$FONT" ]; then
+            echo "error: no TTF/OTF font found in ${cfg.tray.icons.font}" >&2
+            exit 1
+          fi
+
+          gen_icon() {
+            local name="$1" label="$2"
+            local target=88  # 128 - 2*20 padding
+
+            # Convert U+XXXX codepoint syntax to actual UTF-8 character
+            if [[ "$label" =~ ^U\+([0-9A-Fa-f]+)$ ]]; then
+              label=$(printf "\\U''${BASH_REMATCH[1]}")
+            fi
+
+            # Render glyph large, trim to actual bounds, resize to fit target area
+            magick -background none -fill white -font "$FONT" -pointsize 200 \
+              label:"$label" -trim +repage \
+              -resize "''${target}x''${target}" \
+              -gravity center -extent 128x128 \
+              $TMPDIR/glyph.png
+
+            # Composite: rounded rect with glyph cut out
+            magick -size 128x128 xc:none \
+              -fill white -draw "roundrectangle 4,4 123,123 20,20" \
+              $TMPDIR/glyph.png \
+              -compose Dst_Out -composite \
+              $out/$name.png
+          }
+
+          ${lib.concatStringsSep "\n" (lib.mapAttrsToList (name: label:
+            "gen_icon ${lib.escapeShellArg name} ${lib.escapeShellArg label}"
+          ) cfg.tray.icons.labels)}
+        '';
+    in
+    lib.mapAttrs (name: _: "${iconsPkg}/${name}.png") cfg.tray.icons.labels
+  );
+
+  # Merge generated + manual icons (files take priority)
+  allIcons = generatedIcons // cfg.tray.icons.files;
+
   # Generate layer_icons TOML section: map layer names to filenames (basename only)
-  layerIconsConfig = lib.optionalAttrs (cfg.tray.icons != { }) {
-    defaults.layer_icons = lib.mapAttrs (name: path: builtins.baseNameOf path) cfg.tray.icons;
+  layerIconsConfig = lib.optionalAttrs (allIcons != { }) {
+    defaults.layer_icons = lib.mapAttrs (name: path: builtins.baseNameOf path) allIcons;
   };
 
   trayConfig = tomlFormat.generate "kanata-tray.toml" (lib.recursiveUpdate (lib.recursiveUpdate {
@@ -165,16 +214,32 @@ in
       '';
     };
 
-    tray.icons = lib.mkOption {
+    tray.icons.labels = lib.mkOption {
+      type = lib.types.attrsOf lib.types.str;
+      default = { };
+      description = ''
+        Map of kanata layer names to text labels or `U+XXXX` codepoints. When set,
+        generates menu bar icons — a rounded rectangle with the label cut out from
+        the alpha channel (adapts to light/dark mode). Each glyph is automatically
+        scaled to fill the icon. Use `"*"` as a fallback icon.
+      '';
+      example = lib.literalExpression ''{ default = "U+F0B34"; nav = "U+F062"; }'';
+    };
+
+    tray.icons.font = lib.mkOption {
+      type = lib.types.package;
+      default = pkgs.liberation_ttf;
+      description = "Font package (must contain .ttf or .otf files) used for generated layer icons.";
+    };
+
+    tray.icons.files = lib.mkOption {
       type = lib.types.attrsOf lib.types.path;
       default = { };
       description = ''
-        Map of kanata layer names to icon files (PNG recommended).
-        Icons are copied to the kanata-tray icons directory and referenced
-        in kanata-tray.toml automatically. Use `"*"` as a fallback for
-        layers not listed.
+        Map of kanata layer names to custom icon files (PNG recommended).
+        These override generated icons for the same layer name.
       '';
-      example = lib.literalExpression ''{ default = ./icons/default.png; nav = ./icons/nav.png; }'';
+      example = lib.literalExpression ''{ nav = ./icons/nav.png; }'';
     };
 
     tray.settings = lib.mkOption {
@@ -258,12 +323,12 @@ in
       sudo --user=${user} -- mkdir -p "${userHome}/Library/Application Support/kanata-tray"
       sudo --user=${user} -- cp -f ${trayConfig} "${userHome}/Library/Application Support/kanata-tray/kanata-tray.toml"
 
-      ${lib.optionalString (cfg.tray.icons != { }) ''
+      ${lib.optionalString (allIcons != { }) ''
       # Install layer icons
       sudo --user=${user} -- mkdir -p "${userHome}/Library/Application Support/kanata-tray/icons"
       ${lib.concatStringsSep "\n" (lib.mapAttrsToList (name: path:
         ''sudo --user=${user} -- cp -f ${path} "${userHome}/Library/Application Support/kanata-tray/icons/${builtins.baseNameOf path}"''
-      ) cfg.tray.icons)}
+      ) allIcons)}
       ''}
       ''}
 
