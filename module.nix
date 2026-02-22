@@ -167,18 +167,30 @@ in
     };
   };
 
-  config = lib.mkIf cfg.enable {
-    warnings = lib.optional useTccHack ''
-      services.kanata: running in daemon mode with sudoers=false uses a fragile TCC sqlite3 hack
-      to grant Input Monitoring permission. Apple may change the TCC.db schema in future macOS
-      updates, which would silently break kanata — or worse, corrupt the TCC database.
-      Consider using sudoers=true (default) or mode="tray" instead.
-    '';
+  config = lib.mkMerge [
+    # Always stop kanata before launchd services are reconfigured — even when
+    # the module is being disabled. Without this, removing kanata can leave HID
+    # input captured with no output: kanata holds the real keyboard but the
+    # virtual HID device (karabiner-vhid) may already be gone.
+    {
+      system.activationScripts.preActivation.text = lib.mkAfter ''
+        /usr/bin/pkill -x kanata 2>/dev/null && echo "kanata: stopped running kanata process" || true
+        /usr/bin/pkill -x kanata-tray 2>/dev/null && echo "kanata: stopped running kanata-tray process" || true
+      '';
+    }
 
-    environment.systemPackages = [ cfg.package ]
-      ++ lib.optional (cfg.mode == "tray") kanata-tray-app;
+    (lib.mkIf cfg.enable {
+      warnings = lib.optional useTccHack ''
+        services.kanata: running in daemon mode with sudoers=false uses a fragile TCC sqlite3 hack
+        to grant Input Monitoring permission. Apple may change the TCC.db schema in future macOS
+        updates, which would silently break kanata — or worse, corrupt the TCC database.
+        Consider using sudoers=true (default) or mode="tray" instead.
+      '';
 
-    system.activationScripts.postActivation.text = lib.mkAfter ''
+      environment.systemPackages = [ cfg.package ]
+        ++ lib.optional (cfg.mode == "tray") kanata-tray-app;
+
+      system.activationScripts.postActivation.text = lib.mkAfter ''
       # Install Karabiner DriverKit VirtualHIDDevice if not present or outdated.
       # The pkg must be installed outside nix store — macOS rejects code signatures from store paths.
       INSTALLED_VERSION=$(pkgutil --pkg-info org.pqrs.Karabiner-DriverKit-VirtualHIDDevice 2>/dev/null | grep "version:" | awk '{print $2}' || true)
@@ -303,5 +315,5 @@ in
         StandardErrorPath = "/tmp/kanata-tray.err";
       };
     };
-  };
+  })];
 }
