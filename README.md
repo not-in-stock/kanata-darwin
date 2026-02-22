@@ -73,7 +73,21 @@ The `mode` and `sudoers` options combine into four configurations:
 
 ## First activation
 
-On the first `darwin-rebuild switch`, macOS will show a system dialog asking to allow the Karabiner DriverKit extension. Approve it once — subsequent activations are silent.
+On the first `darwin-rebuild switch`, macOS will show a system dialog asking to allow the Karabiner DriverKit extension:
+
+<p align="center">
+  <img src="doc/assets/karabiner-driver-dialog.png" alt="Karabiner DriverKit activation dialog" width="300">
+</p>
+
+Click **"Open System Settings"** to navigate to the driver extension activation page. Do not click "OK" - it will dismiss the dialog without activating the extension.
+
+## Tips
+
+In tray mode without `sudoers`, kanata prompts for a password on each start. To use TouchID instead:
+
+```nix
+security.pam.services.sudo_local.touchIdAuth = true;
+```
 
 ## Karabiner driver
 
