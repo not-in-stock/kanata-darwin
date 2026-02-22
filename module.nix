@@ -16,7 +16,12 @@ let
   karabiner-driver-version = "6.10.0";
 
   tomlFormat = pkgs.formats.toml { };
-  trayConfig = tomlFormat.generate "kanata-tray.toml" (lib.recursiveUpdate {
+  # Generate layer_icons TOML section: map layer names to filenames (basename only)
+  layerIconsConfig = lib.optionalAttrs (cfg.tray.icons != { }) {
+    defaults.layer_icons = lib.mapAttrs (name: path: builtins.baseNameOf path) cfg.tray.icons;
+  };
+
+  trayConfig = tomlFormat.generate "kanata-tray.toml" (lib.recursiveUpdate (lib.recursiveUpdate {
     defaults = {
       kanata_executable = "/Users/${cfg.user}/.local/bin/sudo-kanata";
       tcp_port = 5829;
@@ -27,7 +32,7 @@ let
       autorun = true;
       extra_args = [ "--nodelay" ];
     };
-  } cfg.tray.settings);
+  } layerIconsConfig) cfg.tray.settings);
 
   user = cfg.user;
   userHome = "/Users/${user}";
@@ -160,6 +165,18 @@ in
       '';
     };
 
+    tray.icons = lib.mkOption {
+      type = lib.types.attrsOf lib.types.path;
+      default = { };
+      description = ''
+        Map of kanata layer names to icon files (PNG recommended).
+        Icons are copied to the kanata-tray icons directory and referenced
+        in kanata-tray.toml automatically. Use `"*"` as a fallback for
+        layers not listed.
+      '';
+      example = lib.literalExpression ''{ default = ./icons/default.png; nav = ./icons/nav.png; }'';
+    };
+
     tray.settings = lib.mkOption {
       type = tomlFormat.type;
       default = { };
@@ -240,6 +257,14 @@ in
       # Install kanata-tray TOML config
       sudo --user=${user} -- mkdir -p "${userHome}/Library/Application Support/kanata-tray"
       sudo --user=${user} -- cp -f ${trayConfig} "${userHome}/Library/Application Support/kanata-tray/kanata-tray.toml"
+
+      ${lib.optionalString (cfg.tray.icons != { }) ''
+      # Install layer icons
+      sudo --user=${user} -- mkdir -p "${userHome}/Library/Application Support/kanata-tray/icons"
+      ${lib.concatStringsSep "\n" (lib.mapAttrsToList (name: path:
+        ''sudo --user=${user} -- cp -f ${path} "${userHome}/Library/Application Support/kanata-tray/icons/${builtins.baseNameOf path}"''
+      ) cfg.tray.icons)}
+      ''}
       ''}
 
       ${lib.optionalString (cfg.configSource != null) ''

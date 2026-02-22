@@ -55,6 +55,7 @@ All options are under `services.kanata`.
 | `package` | package | `pkgs.kanata-with-cmd` | The kanata package |
 | `tray.package` | package | from kanata-tray flake | The kanata-tray package |
 | `tray.autostart` | bool | `true` | Create a launchd agent to start kanata-tray at login |
+| `tray.icons` | attrsOf path | `{}` | Map of layer names to icon files (PNG), shown in menu bar |
 | `tray.settings` | TOML attrs | `{}` | Extra settings merged into `kanata-tray.toml` |
 
 ## Modes
