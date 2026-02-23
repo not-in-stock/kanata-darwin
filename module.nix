@@ -195,14 +195,20 @@ in
 
     configFile = lib.mkOption {
       type = lib.types.str;
-      default = "${userHome}/Library/Application Support/kanata/kanata.kbd";
+      default = "${userHome}/.config/kanata/kanata.kbd";
       description = "Path to kanata configuration file.";
     };
 
     configSource = lib.mkOption {
-      type = lib.types.nullOr lib.types.path;
+      type = lib.types.nullOr (lib.types.either lib.types.path lib.types.str);
       default = null;
-      description = "If set, configFile will be symlinked to this path.";
+      description = ''
+        If set, configFile will be symlinked to this path.
+        Use a string for an out-of-store symlink (edits take effect without rebuild):
+          configSource = "/Users/you/.nix-config/kanata.kbd";
+        Use a path to copy into the nix store (immutable, requires rebuild):
+          configSource = ./kanata.kbd;
+      '';
     };
 
     package = lib.mkPackageOption pkgs "kanata" {

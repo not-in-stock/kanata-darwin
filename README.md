@@ -50,8 +50,8 @@ All options are under `services.kanata`.
 | `mode` | `"daemon"` \| `"tray"` | `"tray"` | Launch mode (see below) |
 | `sudoers` | bool | `true` | Add NOPASSWD sudoers entry |
 | `user` | string | `system.primaryUser` | Username for file paths, sudoers, and user agents |
-| `configFile` | string | `~/Library/Application Support/kanata/kanata.kbd` | Path to kanata config |
-| `configSource` | path \| null | `null` | If set, `configFile` is symlinked to this path |
+| `configFile` | string | `~/.config/kanata/kanata.kbd` | Path to kanata config |
+| `configSource` | path \| string \| null | `null` | If set, `configFile` is symlinked to this path; use a string for an out-of-store symlink |
 | `package` | package | `pkgs.kanata-with-cmd` | The kanata package |
 | `tray.package` | package | from kanata-tray flake | The kanata-tray package |
 | `tray.autostart` | bool | `true` | Create a launchd agent to start kanata-tray at login |
