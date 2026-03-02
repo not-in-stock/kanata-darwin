@@ -17,94 +17,105 @@ let
 
   tomlFormat = pkgs.formats.toml { };
 
-  # Generate icons from labels using imagemagick (tray mode only)
-  generatedIcons = lib.optionalAttrs (cfg.mode == "tray" && cfg.tray.icons.labels != { }) (
-    let
-      iconsPkg = pkgs.runCommand "kanata-layer-icons"
-        { nativeBuildInputs = [ pkgs.imagemagick cfg.tray.icons.font ]; }
-        ''
-          mkdir -p $out
-          FONT=$(find ${cfg.tray.icons.font} -name '*.ttf' -o -name '*.otf' | head -1)
-          if [ -z "$FONT" ]; then
-            echo "error: no TTF/OTF font found in ${cfg.tray.icons.font}" >&2
-            exit 1
-          fi
-
-          gen_icon() {
-            local name="$1" label="$2"
-            local target=88  # 128 - 2*20 padding
-
-            # Convert U+XXXX codepoint syntax to actual UTF-8 character
-            if [[ "$label" =~ ^U\+([0-9A-Fa-f]+)$ ]]; then
-              label=$(printf "\\U''${BASH_REMATCH[1]}")
-            fi
-
-            # Render glyph large, trim to actual bounds, resize to fit target area
-            magick -background none -fill white -font "$FONT" -pointsize 200 \
-              label:"$label" -trim +repage \
-              -resize "''${target}x''${target}" \
-              -gravity center -extent 128x128 \
-              $TMPDIR/glyph.png
-
-            # Composite: rounded rect with glyph cut out
-            magick -size 128x128 xc:none \
-              -fill white -draw "roundrectangle 4,4 123,123 20,20" \
-              $TMPDIR/glyph.png \
-              -compose Dst_Out -composite \
-              $out/$name.png
-          }
-
-          ${lib.concatStringsSep "\n" (lib.mapAttrsToList (name: label:
-            "gen_icon ${lib.escapeShellArg name} ${lib.escapeShellArg label}"
-          ) cfg.tray.icons.labels)}
-        '';
-    in
-    lib.mapAttrs (name: _: "${iconsPkg}/${name}.png") cfg.tray.icons.labels
-  );
-
-  # Merge generated + manual icons (files take priority)
-  allIcons = generatedIcons // cfg.tray.icons.files;
-
-  # Generate layer_icons TOML section: map layer names to filenames (basename only)
-  layerIconsConfig = lib.optionalAttrs (allIcons != { }) {
-    defaults.layer_icons = lib.mapAttrs (name: path: builtins.baseNameOf path) allIcons;
-  };
-
-  trayConfig = tomlFormat.generate "kanata-tray.toml" (lib.recursiveUpdate (lib.recursiveUpdate {
-    defaults = {
-      kanata_executable = "/Users/${cfg.user}/.local/bin/sudo-kanata";
-      tcp_port = 5829;
-      autorestart_on_crash = true;
-    };
-    presets.default = {
-      kanata_config = cfg.configFile;
-      autorun = true;
-      extra_args = [ "--nodelay" ];
-    };
-  } layerIconsConfig) cfg.tray.settings);
-
   user = cfg.user;
   userHome = "/Users/${user}";
 
-  sudoKanataWrapper = pkgs.writeScript "sudo-kanata" (if cfg.sudoers then ''
-    #!/bin/bash
-    /usr/bin/sudo /usr/bin/pkill -x kanata 2>/dev/null
-    /usr/bin/sudo ${cfg.package}/bin/kanata "$@" &
-    KANATA_PID=$!
-    # Monitor: when this wrapper is killed (SIGKILL from kanata-tray),
-    # detect death via kill -0 and clean up kanata.
-    (while kill -0 $$ 2>/dev/null; do sleep 0.5; done
-     /usr/bin/sudo /usr/bin/pkill -x kanata 2>/dev/null) &
-    wait $KANATA_PID
-  '' else ''
-    #!/bin/bash
-    /usr/bin/sudo /bin/sh -c '/usr/bin/pkill -x kanata 2>/dev/null; exec ${cfg.package}/bin/kanata "$@"' -- "$@" &
-    KANATA_PID=$!
-    # Monitor: when wrapper is killed, prompt user to authenticate and kill kanata.
-    (while kill -0 $$ 2>/dev/null; do sleep 0.5; done
-     /usr/bin/osascript -e 'do shell script "/usr/bin/pkill -x kanata" with administrator privileges' 2>/dev/null) &
-    wait $KANATA_PID
-  '');
+  # --- kanata-bar package ---
+  kanata-bar-version = "1.0.1";
+  kanata-bar-zip = pkgs.fetchurl {
+    url = "https://github.com/not-in-stock/kanata-bar/releases/download/v${kanata-bar-version}/kanata-bar.app.zip";
+    hash = "sha256-ynm+MRNsjIVx27iZiiANxOxidLuv6WfdTNKBjUPqKIE=";
+  };
+  kanata-bar-app = pkgs.stdenv.mkDerivation {
+    pname = "kanata-bar-app";
+    version = kanata-bar-version;
+    src = kanata-bar-zip;
+    dontUnpack = true;
+    nativeBuildInputs = [ pkgs.unzip ];
+    installPhase = ''
+      mkdir -p "$out/Applications"
+      unzip $src -d "$out/Applications"
+    '';
+  };
+
+  # --- kanata-bar config generation ---
+  barIconsDir = lib.optionalAttrs (cfg.kanata-bar.icons != { }) (
+    pkgs.runCommand "kanata-bar-icons" { } ''
+      mkdir -p $out
+      ${lib.concatStringsSep "\n" (lib.mapAttrsToList (
+        name: path: "cp ${path} $out/${name}.png"
+      ) cfg.kanata-bar.icons)}
+    ''
+  );
+
+  barBaseConfig =
+    {
+      kanata = "${cfg.package}/bin/kanata";
+      config = cfg.configFile;
+      port = 5829;
+      pam_tid = if cfg.sudoers then "auto" else "false";
+      autostart = true;
+      autorestart = true;
+      extra_args = [ "--nodelay" ];
+    }
+    // lib.optionalAttrs (cfg.kanata-bar.icons != { }) {
+      icons_dir = "${barIconsDir}";
+    };
+
+  barConfig = tomlFormat.generate "kanata-bar.toml" (
+    lib.recursiveUpdate barBaseConfig cfg.kanata-bar.settings
+  );
+
+  # --- kanata-tray ---
+  # Layer icons config for kanata-tray TOML
+  layerIconsConfig = lib.optionalAttrs (cfg.kanata-tray.icons != { }) {
+    defaults.layer_icons = lib.mapAttrs (name: path: builtins.baseNameOf path) cfg.kanata-tray.icons;
+  };
+
+  trayConfig = tomlFormat.generate "kanata-tray.toml" (
+    lib.recursiveUpdate
+      (lib.recursiveUpdate
+        {
+          defaults = {
+            kanata_executable = "${userHome}/.local/bin/sudo-kanata";
+            tcp_port = 5829;
+            autorestart_on_crash = true;
+          };
+          presets.default = {
+            kanata_config = cfg.configFile;
+            autorun = true;
+            extra_args = [ "--nodelay" ];
+          };
+        }
+        layerIconsConfig
+      )
+      cfg.kanata-tray.settings
+  );
+
+  sudoKanataWrapper = pkgs.writeScript "sudo-kanata" (
+    if cfg.sudoers then
+      ''
+        #!/bin/bash
+        /usr/bin/sudo /usr/bin/pkill -x kanata 2>/dev/null
+        /usr/bin/sudo ${cfg.package}/bin/kanata "$@" &
+        KANATA_PID=$!
+        # Monitor: when this wrapper is killed (SIGKILL from kanata-tray),
+        # detect death via kill -0 and clean up kanata.
+        (while kill -0 $$ 2>/dev/null; do sleep 0.5; done
+         /usr/bin/sudo /usr/bin/pkill -x kanata 2>/dev/null) &
+        wait $KANATA_PID
+      ''
+    else
+      ''
+        #!/bin/bash
+        /usr/bin/sudo /bin/sh -c '/usr/bin/pkill -x kanata 2>/dev/null; exec ${cfg.package}/bin/kanata "$@"' -- "$@" &
+        KANATA_PID=$!
+        # Monitor: when wrapper is killed, prompt user to authenticate and kill kanata.
+        (while kill -0 $$ 2>/dev/null; do sleep 0.5; done
+         /usr/bin/osascript -e 'do shell script "/usr/bin/pkill -x kanata" with administrator privileges' 2>/dev/null) &
+        wait $KANATA_PID
+      ''
+  );
 
   kanata-icon = pkgs.fetchurl {
     url = "https://raw.githubusercontent.com/jtroo/kanata/refs/heads/main/assets/kanata-icon.svg";
@@ -125,7 +136,7 @@ let
       cp AppIcon.png "$APP/Resources/"
       cat > "$APP/MacOS/kanata-tray" << WRAPPER
       #!/bin/sh
-      exec ${cfg.tray.package}/bin/kanata-tray "\$@"
+      exec ${cfg.kanata-tray.package}/bin/kanata-tray "\$@"
       WRAPPER
       chmod +x "$APP/MacOS/kanata-tray"
       cat > "$APP/Info.plist" << 'EOF'
@@ -154,28 +165,23 @@ let
   };
 
   # Whether to run kanata as a root launchd daemon with TCC sqlite3 hack.
-  # Only when mode=daemon and sudoers is disabled.
-  useTccHack = cfg.mode == "daemon" && !cfg.sudoers;
+  # Only when daemon mode enabled and sudoers is disabled.
+  useTccHack = cfg.daemon.enable && !cfg.sudoers;
 
   # Whether kanata runs via sudo (user agent or tray wrapper).
-  usesSudo = cfg.mode == "daemon" && cfg.sudoers || cfg.mode == "tray";
+  usesSudo = (cfg.daemon.enable && cfg.sudoers) || cfg.kanata-tray.enable;
+
+  # Count how many launch submodules are enabled
+  enabledCount = lib.count (x: x) [
+    cfg.daemon.enable
+    cfg.kanata-tray.enable
+    cfg.kanata-bar.enable
+  ];
 in
 
 {
   options.services.kanata = {
     enable = lib.mkEnableOption "kanata keyboard remapper with Karabiner DriverKit";
-
-    mode = lib.mkOption {
-      type = lib.types.enum [ "daemon" "tray" ];
-      default = "tray";
-      description = ''
-        How kanata is launched:
-        - `daemon` — headless, no GUI. With `sudoers = true` (default): user launchd agent
-          via sudo NOPASSWD. With `sudoers = false`: root launchd daemon with TCC sqlite3 hack.
-        - `tray` — launched by kanata-tray GUI via sudo. With `sudoers = false` (default):
-          prompts for TouchID/password on each start. With `sudoers = true`: no prompts.
-      '';
-    };
 
     sudoers = lib.mkOption {
       type = lib.types.bool;
@@ -215,54 +221,91 @@ in
       default = "kanata-with-cmd";
     };
 
-    tray.package = lib.mkOption {
-      type = lib.types.package;
-      default = kanata-tray.packages.${pkgs.stdenv.hostPlatform.system}.kanata-tray;
-      description = "The kanata-tray package.";
+    # --- daemon submodule ---
+    daemon = {
+      enable = lib.mkEnableOption "headless kanata launchd service";
+      launchd = lib.mkOption {
+        type = lib.types.attrs;
+        default = { };
+        description = "Extra attributes merged into the launchd service config.";
+      };
     };
 
-    tray.autostart = lib.mkOption {
-      type = lib.types.bool;
-      default = true;
-      description = ''
-        Whether to create a launchd user agent that starts kanata-tray automatically at login.
-        When false, the .app bundle is still available in /Applications/Nix Apps/ — you can
-        add it to System Settings → General → Login Items → Open at Login manually.
-      '';
+    # --- kanata-tray submodule ---
+    kanata-tray = {
+      enable = lib.mkEnableOption "kanata-tray GUI launcher";
+      package = lib.mkOption {
+        type = lib.types.package;
+        default = kanata-tray.packages.${pkgs.stdenv.hostPlatform.system}.kanata-tray;
+        description = "The kanata-tray package.";
+      };
+      autostart = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = ''
+          Whether to create a launchd user agent that starts kanata-tray automatically at login.
+          When false, the .app bundle is still available in /Applications/Nix Apps/.
+        '';
+      };
+      launchd = lib.mkOption {
+        type = lib.types.attrs;
+        default = { };
+        description = "Extra attributes merged into the launchd service config.";
+      };
+      icons = lib.mkOption {
+        type = lib.types.attrsOf lib.types.path;
+        default = { };
+        description = ''
+          Map of kanata layer names to icon files (PNG recommended).
+          Use `mkLayerIcons` to generate icons from font glyphs.
+        '';
+        example = lib.literalExpression ''{ nav = ./icons/nav.png; }'';
+      };
+      settings = lib.mkOption {
+        type = tomlFormat.type;
+        default = { };
+        description = "Extra settings merged into kanata-tray.toml.";
+      };
     };
 
-    tray.icons.labels = lib.mkOption {
-      type = lib.types.attrsOf lib.types.str;
-      default = { };
-      description = ''
-        Map of kanata layer names to text labels or `U+XXXX` codepoints. When set,
-        generates menu bar icons — a rounded rectangle with the label cut out from
-        the alpha channel (adapts to light/dark mode). Each glyph is automatically
-        scaled to fill the icon. Use `"*"` as a fallback icon.
-      '';
-      example = lib.literalExpression ''{ default = "U+F0B34"; nav = "U+F062"; }'';
-    };
-
-    tray.icons.font = lib.mkOption {
-      type = lib.types.package;
-      default = pkgs.liberation_ttf;
-      description = "Font package (must contain .ttf or .otf files) used for generated layer icons.";
-    };
-
-    tray.icons.files = lib.mkOption {
-      type = lib.types.attrsOf lib.types.path;
-      default = { };
-      description = ''
-        Map of kanata layer names to custom icon files (PNG recommended).
-        These override generated icons for the same layer name.
-      '';
-      example = lib.literalExpression ''{ nav = ./icons/nav.png; }'';
-    };
-
-    tray.settings = lib.mkOption {
-      type = tomlFormat.type;
-      default = { };
-      description = "Extra settings merged into kanata-tray.toml.";
+    # --- kanata-bar submodule ---
+    kanata-bar = {
+      enable = lib.mkEnableOption "kanata-bar GUI launcher";
+      package = lib.mkOption {
+        type = lib.types.package;
+        default = kanata-bar-app;
+        description = "The kanata-bar .app package.";
+      };
+      autostart = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = ''
+          Whether to create a launchd user agent that starts kanata-bar automatically at login.
+          When false, you can start it manually from /Applications/Nix Apps/.
+        '';
+      };
+      launchd = lib.mkOption {
+        type = lib.types.attrs;
+        default = { };
+        description = "Extra attributes merged into the launchd service config.";
+      };
+      settings = lib.mkOption {
+        type = tomlFormat.type;
+        default = { };
+        description = ''
+          Settings merged into kanata-bar config.toml.
+          Auto-propagated defaults: kanata, config, port, pam_tid, autostart, autorestart, extra_args.
+        '';
+      };
+      icons = lib.mkOption {
+        type = lib.types.attrsOf lib.types.path;
+        default = { };
+        description = ''
+          Map of kanata layer names to icon files (PNG recommended).
+          Use `mkLayerIcons` to generate icons from font glyphs.
+        '';
+        example = lib.literalExpression ''{ nav = ./icons/nav.png; }'';
+      };
     };
   };
 
@@ -275,152 +318,191 @@ in
       system.activationScripts.preActivation.text = lib.mkAfter ''
         /usr/bin/pkill -x kanata 2>/dev/null && echo "kanata: stopped running kanata process" || true
         /usr/bin/pkill -x kanata-tray 2>/dev/null && echo "kanata: stopped running kanata-tray process" || true
+        /usr/bin/pkill -x kanata-bar 2>/dev/null && echo "kanata: stopped running kanata-bar process" || true
       '';
     }
 
     (lib.mkIf cfg.enable {
+      assertions = [
+        {
+          assertion = enabledCount <= 1;
+          message = "services.kanata: enable at most one of daemon, kanata-tray, kanata-bar";
+        }
+      ];
+
       warnings = lib.optional useTccHack ''
         services.kanata: running in daemon mode with sudoers=false uses a fragile TCC sqlite3 hack
         to grant Input Monitoring permission. Apple may change the TCC.db schema in future macOS
         updates, which would silently break kanata — or worse, corrupt the TCC database.
-        Consider using sudoers=true (default) or mode="tray" instead.
+        Consider using sudoers=true (default) or kanata-bar/kanata-tray instead.
       '';
 
-      environment.systemPackages = [ cfg.package ]
-        ++ lib.optional (cfg.mode == "tray") kanata-tray-app;
+      environment.systemPackages =
+        [ cfg.package ]
+        ++ lib.optional cfg.kanata-tray.enable kanata-tray-app
+        ++ lib.optional cfg.kanata-bar.enable cfg.kanata-bar.package;
 
       system.activationScripts.postActivation.text = lib.mkAfter ''
-      # Install Karabiner DriverKit VirtualHIDDevice if not present or outdated.
-      # The pkg must be installed outside nix store — macOS rejects code signatures from store paths.
-      INSTALLED_VERSION=$(pkgutil --pkg-info org.pqrs.Karabiner-DriverKit-VirtualHIDDevice 2>/dev/null | grep "version:" | awk '{print $2}' || true)
-      MANAGER="/Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/MacOS/Karabiner-VirtualHIDDevice-Manager"
-      if [ "$INSTALLED_VERSION" != "${karabiner-driver-version}" ] || [ ! -x "$MANAGER" ]; then
-        echo "kanata: installing Karabiner DriverKit VirtualHIDDevice ${karabiner-driver-version} (current: $INSTALLED_VERSION)"
-        installer -pkg "${karabiner-driver-pkg}" -target /
-      else
-        echo "kanata: Karabiner DriverKit VirtualHIDDevice ${karabiner-driver-version} already installed"
-      fi
-
-      # Activate the driver extension. On first run, macOS shows a system dialog requiring approval.
-      # On subsequent runs, this is a no-op (idempotent).
-      if [ -x "$MANAGER" ]; then
-        "$MANAGER" activate 2>&1 || true
-      fi
-
-      ${lib.optionalString useTccHack ''
-      # Grant kanata Input Monitoring (kTCCServiceListenEvent) permission via TCC sqlite3 hack.
-      # Only needed when running as root daemon without sudoers — sudo provides sufficient
-      # privileges for IOHIDDeviceOpen without a TCC entry.
-      # WARNING: fragile — Apple may change TCC.db schema in future macOS versions.
-      KANATA_BIN="${cfg.package}/bin/kanata"
-      if [ -x "$KANATA_BIN" ]; then
-        CDHASH=$(codesign -dvvv "$KANATA_BIN" 2>&1 | grep "CDHash=" | head -1 | cut -d= -f2)
-        if [ -n "$CDHASH" ]; then
-          CSREQ_HEX="FADE0C0000000028000000010000000800000014$(echo "$CDHASH" | tr '[:lower:]' '[:upper:]')"
-          /usr/bin/sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "
-            DELETE FROM access WHERE service='kTCCServiceListenEvent' AND client LIKE '%/kanata';
-            INSERT INTO access (service, client, client_type, auth_value, auth_reason, auth_version, csreq, flags, indirect_object_identifier)
-            VALUES ('kTCCServiceListenEvent', '$KANATA_BIN', 1, 2, 4, 1, X'$CSREQ_HEX', 0, 'UNUSED');
-          "
-          echo "kanata: updated Input Monitoring TCC entry for $KANATA_BIN"
+        # Install Karabiner DriverKit VirtualHIDDevice if not present or outdated.
+        # The pkg must be installed outside nix store — macOS rejects code signatures from store paths.
+        INSTALLED_VERSION=$(pkgutil --pkg-info org.pqrs.Karabiner-DriverKit-VirtualHIDDevice 2>/dev/null | grep "version:" | awk '{print $2}' || true)
+        MANAGER="/Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/MacOS/Karabiner-VirtualHIDDevice-Manager"
+        if [ "$INSTALLED_VERSION" != "${karabiner-driver-version}" ] || [ ! -x "$MANAGER" ]; then
+          echo "kanata: installing Karabiner DriverKit VirtualHIDDevice ${karabiner-driver-version} (current: $INSTALLED_VERSION)"
+          installer -pkg "${karabiner-driver-pkg}" -target /
+        else
+          echo "kanata: Karabiner DriverKit VirtualHIDDevice ${karabiner-driver-version} already installed"
         fi
-      fi
 
-      # Restart kanata to pick up updated TCC entry.
-      launchctl kickstart -k system/org.kanata.daemon &>/dev/null &
-      ''}
+        # Activate the driver extension. On first run, macOS shows a system dialog requiring approval.
+        # On subsequent runs, this is a no-op (idempotent).
+        if [ -x "$MANAGER" ]; then
+          "$MANAGER" activate 2>&1 || true
+        fi
 
-      ${lib.optionalString (cfg.mode == "tray") ''
-      # Create sudo-kanata wrapper
-      sudo --user=${user} -- mkdir -p "${userHome}/.local/bin"
-      sudo --user=${user} -- cp -f ${sudoKanataWrapper} "${userHome}/.local/bin/sudo-kanata"
-      sudo --user=${user} -- chmod +x "${userHome}/.local/bin/sudo-kanata"
+        ${lib.optionalString useTccHack ''
+          # Grant kanata Input Monitoring (kTCCServiceListenEvent) permission via TCC sqlite3 hack.
+          KANATA_BIN="${cfg.package}/bin/kanata"
+          if [ -x "$KANATA_BIN" ]; then
+            CDHASH=$(codesign -dvvv "$KANATA_BIN" 2>&1 | grep "CDHash=" | head -1 | cut -d= -f2)
+            if [ -n "$CDHASH" ]; then
+              CSREQ_HEX="FADE0C0000000028000000010000000800000014$(echo "$CDHASH" | tr '[:lower:]' '[:upper:]')"
+              /usr/bin/sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "
+                DELETE FROM access WHERE service='kTCCServiceListenEvent' AND client LIKE '%/kanata';
+                INSERT INTO access (service, client, client_type, auth_value, auth_reason, auth_version, csreq, flags, indirect_object_identifier)
+                VALUES ('kTCCServiceListenEvent', '$KANATA_BIN', 1, 2, 4, 1, X'$CSREQ_HEX', 0, 'UNUSED');
+              "
+              echo "kanata: updated Input Monitoring TCC entry for $KANATA_BIN"
+            fi
+          fi
 
-      # Install kanata-tray TOML config
-      sudo --user=${user} -- mkdir -p "${userHome}/Library/Application Support/kanata-tray"
-      sudo --user=${user} -- cp -f ${trayConfig} "${userHome}/Library/Application Support/kanata-tray/kanata-tray.toml"
+          # Restart kanata to pick up updated TCC entry.
+          launchctl kickstart -k system/org.kanata.daemon &>/dev/null &
+        ''}
 
-      ${lib.optionalString (allIcons != { }) ''
-      # Install layer icons
-      sudo --user=${user} -- mkdir -p "${userHome}/Library/Application Support/kanata-tray/icons"
-      ${lib.concatStringsSep "\n" (lib.mapAttrsToList (name: path:
-        ''sudo --user=${user} -- cp -f ${path} "${userHome}/Library/Application Support/kanata-tray/icons/${builtins.baseNameOf path}"''
-      ) allIcons)}
-      ''}
-      ''}
+        ${lib.optionalString cfg.kanata-tray.enable ''
+          # Create sudo-kanata wrapper
+          sudo --user=${user} -- mkdir -p "${userHome}/.local/bin"
+          sudo --user=${user} -- cp -f ${sudoKanataWrapper} "${userHome}/.local/bin/sudo-kanata"
+          sudo --user=${user} -- chmod +x "${userHome}/.local/bin/sudo-kanata"
 
-      ${lib.optionalString (cfg.configSource != null) ''
-      # Symlink kanata config
-      sudo --user=${user} -- mkdir -p "$(dirname "${cfg.configFile}")"
-      sudo --user=${user} -- ln -sf ${cfg.configSource} "${cfg.configFile}"
-      ''}
-    '';
+          # Install kanata-tray TOML config
+          sudo --user=${user} -- mkdir -p "${userHome}/Library/Application Support/kanata-tray"
+          sudo --user=${user} -- cp -f ${trayConfig} "${userHome}/Library/Application Support/kanata-tray/kanata-tray.toml"
 
-    launchd.daemons.karabiner-vhid = {
-      serviceConfig = {
-        Label = "org.pqrs.Karabiner-VirtualHIDDevice-Daemon";
-        Program = "/Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice/Applications/Karabiner-VirtualHIDDevice-Daemon.app/Contents/MacOS/Karabiner-VirtualHIDDevice-Daemon";
-        RunAtLoad = true;
-        KeepAlive = true;
-      };
-    };
+          ${lib.optionalString (cfg.kanata-tray.icons != { }) ''
+            # Install layer icons
+            sudo --user=${user} -- mkdir -p "${userHome}/Library/Application Support/kanata-tray/icons"
+            ${lib.concatStringsSep "\n" (lib.mapAttrsToList (
+              name: path:
+              ''sudo --user=${user} -- cp -f ${path} "${userHome}/Library/Application Support/kanata-tray/icons/${builtins.baseNameOf path}"''
+            ) cfg.kanata-tray.icons)}
+          ''}
+        ''}
 
-    # daemon + sudoers=false: root launchd daemon (requires TCC hack)
-    launchd.daemons.kanata = lib.mkIf useTccHack {
-      serviceConfig = {
-        Label = "org.kanata.daemon";
-        ProgramArguments = [
-          "${cfg.package}/bin/kanata"
-          "--cfg"
-          cfg.configFile
-          "--nodelay"
-        ];
-        RunAtLoad = false;
-        KeepAlive = {
-          PathState = {
-            "/Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice" = true;
-          };
+        ${lib.optionalString cfg.kanata-bar.enable ''
+          # Install kanata-bar config
+          sudo --user=${user} -- mkdir -p "${userHome}/.config/kanata-bar"
+          sudo --user=${user} -- cp -f ${barConfig} "${userHome}/.config/kanata-bar/config.toml"
+        ''}
+
+        ${lib.optionalString (cfg.configSource != null) ''
+          # Symlink kanata config
+          sudo --user=${user} -- mkdir -p "$(dirname "${cfg.configFile}")"
+          sudo --user=${user} -- ln -sf ${cfg.configSource} "${cfg.configFile}"
+        ''}
+      '';
+
+      launchd.daemons.karabiner-vhid = {
+        serviceConfig = {
+          Label = "org.pqrs.Karabiner-VirtualHIDDevice-Daemon";
+          Program = "/Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice/Applications/Karabiner-VirtualHIDDevice-Daemon.app/Contents/MacOS/Karabiner-VirtualHIDDevice-Daemon";
+          RunAtLoad = true;
+          KeepAlive = true;
         };
-        StandardOutPath = "/tmp/kanata.log";
-        StandardErrorPath = "/tmp/kanata.err";
-        SessionCreate = true;
-        ThrottleInterval = 3;
       };
-    };
 
-    # daemon + sudoers=true: user agent via sudo NOPASSWD (no TCC hack)
-    launchd.user.agents.kanata = lib.mkIf (cfg.mode == "daemon" && cfg.sudoers) {
-      serviceConfig = {
-        Label = "org.kanata.daemon";
-        ProgramArguments = [
-          "/usr/bin/sudo"
-          "${cfg.package}/bin/kanata"
-          "--cfg"
-          cfg.configFile
-          "--nodelay"
-        ];
-        RunAtLoad = true;
-        KeepAlive = true;
-        StandardOutPath = "/tmp/kanata.log";
-        StandardErrorPath = "/tmp/kanata.err";
-        ThrottleInterval = 3;
+      # daemon + sudoers=false: root launchd daemon (requires TCC hack)
+      launchd.daemons.kanata = lib.mkIf useTccHack {
+        serviceConfig =
+          {
+            Label = "org.kanata.daemon";
+            ProgramArguments = [
+              "${cfg.package}/bin/kanata"
+              "--cfg"
+              cfg.configFile
+              "--nodelay"
+            ];
+            RunAtLoad = false;
+            KeepAlive = {
+              PathState = {
+                "/Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice" = true;
+              };
+            };
+            StandardOutPath = "/tmp/kanata.log";
+            StandardErrorPath = "/tmp/kanata.err";
+            SessionCreate = true;
+            ThrottleInterval = 3;
+          }
+          // cfg.daemon.launchd;
       };
-    };
 
-    # sudoers NOPASSWD entry for kanata and pkill (used by sudo-kanata wrapper)
-    security.sudo.extraConfig = lib.mkIf cfg.sudoers
-      "${user} ALL=(root) NOPASSWD: ${cfg.package}/bin/kanata, /usr/bin/pkill -x kanata";
-
-    # tray mode: kanata-tray user agent (not created when loginItem=true)
-    launchd.user.agents.kanata-tray = lib.mkIf (cfg.mode == "tray" && cfg.tray.autostart) {
-      serviceConfig = {
-        Label = "org.kanata.tray";
-        ProgramArguments = [ "${kanata-tray-app}/Applications/Kanata Tray.app/Contents/MacOS/kanata-tray" ];
-        RunAtLoad = true;
-        KeepAlive = false;
-        StandardOutPath = "/tmp/kanata-tray.log";
-        StandardErrorPath = "/tmp/kanata-tray.err";
+      # daemon + sudoers=true: user agent via sudo NOPASSWD (no TCC hack)
+      launchd.user.agents.kanata = lib.mkIf (cfg.daemon.enable && cfg.sudoers) {
+        serviceConfig =
+          {
+            Label = "org.kanata.daemon";
+            ProgramArguments = [
+              "/usr/bin/sudo"
+              "${cfg.package}/bin/kanata"
+              "--cfg"
+              cfg.configFile
+              "--nodelay"
+            ];
+            RunAtLoad = true;
+            KeepAlive = true;
+            StandardOutPath = "/tmp/kanata.log";
+            StandardErrorPath = "/tmp/kanata.err";
+            ThrottleInterval = 3;
+          }
+          // cfg.daemon.launchd;
       };
-    };
-  })];
+
+      # sudoers NOPASSWD entry for kanata and pkill
+      security.sudo.extraConfig = lib.mkIf (cfg.sudoers && enabledCount > 0)
+        "${user} ALL=(root) NOPASSWD: ${cfg.package}/bin/kanata, /usr/bin/pkill -x kanata";
+
+      # kanata-tray: user agent
+      launchd.user.agents.kanata-tray = lib.mkIf (cfg.kanata-tray.enable && cfg.kanata-tray.autostart) {
+        serviceConfig =
+          {
+            Label = "org.kanata.tray";
+            ProgramArguments = [ "${kanata-tray-app}/Applications/Kanata Tray.app/Contents/MacOS/kanata-tray" ];
+            RunAtLoad = true;
+            KeepAlive = false;
+            StandardOutPath = "/tmp/kanata-tray.log";
+            StandardErrorPath = "/tmp/kanata-tray.err";
+          }
+          // cfg.kanata-tray.launchd;
+      };
+
+      # kanata-bar: user agent
+      launchd.user.agents.kanata-bar = lib.mkIf (cfg.kanata-bar.enable && cfg.kanata-bar.autostart) {
+        serviceConfig =
+          {
+            Label = "com.kanata-bar";
+            ProgramArguments = [
+              "${cfg.kanata-bar.package}/Applications/Kanata Bar.app/Contents/MacOS/kanata-bar"
+              "--config-file"
+              "${userHome}/.config/kanata-bar/config.toml"
+            ];
+            RunAtLoad = true;
+            KeepAlive = false;
+            StandardOutPath = "/tmp/kanata-bar.log";
+            StandardErrorPath = "/tmp/kanata-bar.err";
+          }
+          // cfg.kanata-bar.launchd;
+      };
+    })
+  ];
 }
