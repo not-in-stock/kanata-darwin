@@ -47,7 +47,7 @@ let
         extra_args = [ "--nodelay" ];
       };
       kanata_bar = {
-        autostart_kanata = true;
+        autostart_kanata = false;
         autorestart_kanata = true;
       } // lib.optionalAttrs (cfg.kanata-bar.icons != { }) {
         icons_dir = "${barIconsDir}";
