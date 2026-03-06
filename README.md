@@ -56,8 +56,8 @@ services.kanata = {
 
   kanata-bar = {
     enable = true;
-    settings.pam_tid = "auto";
-    settings.autorestart = true;
+    settings.kanata.pam_tid = "auto";
+    settings.kanata_bar.autorestart_kanata = true;
     icons = inputs.kanata-darwin.lib.mkLayerIcons pkgs {
       font = pkgs.nerd-fonts.sauce-code-pro;
       labels = {

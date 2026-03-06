@@ -11,10 +11,10 @@ let
   userHome = "/Users/${user}";
   tomlFormat = pkgs.formats.toml { };
 
-  kanata-bar-version = "1.0.1";
+  kanata-bar-version = "1.0.12";
   kanata-bar-zip = pkgs.fetchurl {
     url = "https://github.com/not-in-stock/kanata-bar/releases/download/v${kanata-bar-version}/kanata-bar.app.zip";
-    hash = "sha256-ynm+MRNsjIVx27iZiiANxOxidLuv6WfdTNKBjUPqKIE=";
+    hash = "sha256-G2p+obkPuQvW3Ua+RvKDSyovmJ7VNTb3kERo6meIQhQ=";
   };
   kanata-bar-app = pkgs.stdenv.mkDerivation {
     pname = "kanata-bar-app";
@@ -39,16 +39,19 @@ let
 
   barBaseConfig =
     {
-      kanata = "${cfg.package}/bin/kanata";
-      config = cfg.configFile;
-      port = 5829;
-      pam_tid = if cfg.sudoers then "auto" else "false";
-      autostart = true;
-      autorestart = true;
-      extra_args = [ "--nodelay" ];
-    }
-    // lib.optionalAttrs (cfg.kanata-bar.icons != { }) {
-      icons_dir = "${barIconsDir}";
+      kanata = {
+        path = "${cfg.package}/bin/kanata";
+        config = cfg.configFile;
+        port = 5829;
+        pam_tid = if cfg.sudoers then "auto" else "false";
+        extra_args = [ "--nodelay" ];
+      };
+      kanata_bar = {
+        autostart_kanata = true;
+        autorestart_kanata = true;
+      } // lib.optionalAttrs (cfg.kanata-bar.icons != { }) {
+        icons_dir = "${barIconsDir}";
+      };
     };
 
   barConfig = tomlFormat.generate "kanata-bar.toml" (
@@ -82,7 +85,7 @@ in
       default = { };
       description = ''
         Settings merged into kanata-bar config.toml.
-        Auto-propagated defaults: kanata, config, port, pam_tid, autostart, autorestart, extra_args.
+        Auto-propagated defaults: kanata.{path,config,port,pam_tid,extra_args}, kanata_bar.{autostart_kanata,autorestart_kanata}.
       '';
     };
     icons = lib.mkOption {
