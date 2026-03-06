@@ -1,0 +1,60 @@
+name: Auto-bump kanata-bar
+
+on:
+  repository_dispatch:
+    types: [bump-kanata-bar]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to bump to (without v prefix)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    env:
+      NIX_PATH: modules/kanata-bar.nix
+      REPO_SLUG: not-in-stock/kanata-bar
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve version
+        id: version
+        run: |
+          version="${{ github.event.client_payload.version || github.event.inputs.version }}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Version: $version"
+
+      - name: Compute SRI hash
+        id: hash
+        run: |
+          url="https://github.com/${{ env.REPO_SLUG }}/releases/download/v${{ steps.version.outputs.version }}/kanata-bar.app.zip"
+          echo "Downloading: $url"
+          nix32=$(nix-prefetch-url "$url" 2>/dev/null)
+          sri=$(nix hash convert --hash-algo sha256 --to sri "$nix32")
+          echo "hash=$sri" >> "$GITHUB_OUTPUT"
+          echo "SRI hash: $sri"
+
+      - name: Update nix module
+        run: |
+          sed -i -E 's/kanata-bar-version = "[^"]+"/kanata-bar-version = "${{ steps.version.outputs.version }}"/' "$NIX_PATH"
+          sed -i -E 's|hash = "[^"]+"|hash = "${{ steps.hash.outputs.hash }}"|' "$NIX_PATH"
+          echo "Updated nix diff:"
+          git --no-pager diff -- "$NIX_PATH"
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$NIX_PATH"
+          git commit -m "kanata-bar: bump to ${{ steps.version.outputs.version }}"
+          git push
