@@ -108,7 +108,7 @@ in
         fi
 
         if [ -x "$MANAGER" ]; then
-          "$MANAGER" activate 2>&1 || true
+          "$MANAGER" activate >/dev/null 2>&1 || true
         fi
 
         ${lib.optionalString (cfg.configSource != null) ''
