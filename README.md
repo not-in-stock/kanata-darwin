@@ -227,16 +227,3 @@ security.pam.services.sudo_local.touchIdAuth = true;
 ## Karabiner driver
 
 The module automatically installs the Karabiner DriverKit VirtualHIDDevice package and starts its daemon via launchd. The driver pkg is installed outside the Nix store because macOS rejects code signatures from store paths.
-
-## Migration from mode-based API
-
-If upgrading from the old `mode`/`tray.*` API:
-
-```
-mode = "tray"              → kanata-tray.enable = true
-mode = "daemon"            → daemon.enable = true
-tray.icons.labels/files    → use mkLayerIcons, pass to kanata-tray.icons
-tray.autostart             → kanata-tray.autostart
-tray.package               → kanata-tray.package
-tray.settings              → kanata-tray.settings
-```
