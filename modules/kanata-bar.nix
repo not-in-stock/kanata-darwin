@@ -48,7 +48,7 @@ let
       kanata_bar = {
         autostart_kanata = false;
         autorestart_kanata = true;
-        pam_touchid = if cfg.sudoers then "auto" else "false";
+        pam_touchid = "auto";
       } // lib.optionalAttrs (cfg.kanata-bar.icons != { }) {
         icons_dir = "${barIconsDir}";
       };
