@@ -43,12 +43,12 @@ let
         path = "${cfg.package}/bin/kanata";
         config = cfg.configFile;
         port = 5829;
-        pam_tid = if cfg.sudoers then "auto" else "false";
         extra_args = [ "--nodelay" ];
       };
       kanata_bar = {
         autostart_kanata = false;
         autorestart_kanata = true;
+        pam_touchid = if cfg.sudoers then "auto" else "false";
       } // lib.optionalAttrs (cfg.kanata-bar.icons != { }) {
         icons_dir = "${barIconsDir}";
       };
@@ -85,7 +85,7 @@ in
       default = { };
       description = ''
         Settings merged into kanata-bar config.toml.
-        Auto-propagated defaults: kanata.{path,config,port,pam_tid,extra_args}, kanata_bar.{autostart_kanata,autorestart_kanata}.
+        Auto-propagated defaults: kanata.{path,config,port,extra_args}, kanata_bar.{autostart_kanata,autorestart_kanata,pam_touchid}.
       '';
     };
     icons = lib.mkOption {

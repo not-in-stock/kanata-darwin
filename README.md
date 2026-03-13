@@ -56,7 +56,7 @@ services.kanata = {
 
   kanata-bar = {
     enable = true;
-    settings.kanata.pam_tid = "auto";
+    settings.kanata_bar.pam_touchid = "auto";
     settings.kanata_bar.autorestart_kanata = true;
     icons = inputs.kanata-darwin.lib.mkLayerIcons pkgs {
       font = pkgs.nerd-fonts.sauce-code-pro;
@@ -148,7 +148,7 @@ All options are under `services.kanata`.
 
 | Mode | sudoers | How it works |
 |---|---|---|
-| `kanata-bar` | `false` (recommended) | kanata-bar handles privilege escalation via TouchID/password (pam_tid) |
+| `kanata-bar` | `false` (recommended) | kanata-bar handles privilege escalation via TouchID/password (pam_touchid) |
 | `kanata-bar` | `true` | kanata-bar uses sudo NOPASSWD for kanata |
 | `kanata-tray` | `true` (recommended) | kanata-tray launches kanata via sudo NOPASSWD wrapper |
 | `kanata-tray` | `false` | Prompts for TouchID/password on start; password dialog on stop |
