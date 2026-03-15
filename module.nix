@@ -80,7 +80,7 @@ in
     # input captured with no output.
     {
       system.activationScripts.preActivation.text = lib.mkAfter ''
-        /usr/bin/pkill -x kanata 2>/dev/null && echo "kanata: stopped running kanata process" || true
+        /usr/bin/pkill -KILL -x kanata 2>/dev/null && echo "kanata: stopped running kanata process" || true
         /usr/bin/pkill -x kanata-tray 2>/dev/null && echo "kanata: stopped running kanata-tray process" || true
         /usr/bin/pkill -x kanata-bar 2>/dev/null && echo "kanata: stopped running kanata-bar process" || true
       '';
