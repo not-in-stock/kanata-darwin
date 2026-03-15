@@ -16,9 +16,9 @@ in
   options.services.kanata.daemon = {
     enable = lib.mkEnableOption "headless kanata launchd service";
     launchd = lib.mkOption {
-      type = lib.types.attrs;
+      type = lib.types.attrsOf lib.types.anything;
       default = { };
-      description = "Extra attributes merged into the launchd service config.";
+      description = "Extra attributes shallow-merged into the launchd service config (nested keys are replaced, not deep-merged).";
     };
   };
 

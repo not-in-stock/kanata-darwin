@@ -76,9 +76,9 @@ in
       '';
     };
     launchd = lib.mkOption {
-      type = lib.types.attrs;
+      type = lib.types.attrsOf lib.types.anything;
       default = { };
-      description = "Extra attributes merged into the launchd service config.";
+      description = "Extra attributes shallow-merged into the launchd service config (nested keys are replaced, not deep-merged).";
     };
     settings = lib.mkOption {
       type = tomlFormat.type;
