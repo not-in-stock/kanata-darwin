@@ -113,8 +113,8 @@ in
 
         ${lib.optionalString (cfg.configSource != null) ''
           # Symlink kanata config
-          sudo --user=${user} -- mkdir -p "$(dirname "${cfg.configFile}")"
-          sudo --user=${user} -- ln -sf ${cfg.configSource} "${cfg.configFile}"
+          sudo --user="${user}" -- mkdir -p "$(dirname "${cfg.configFile}")"
+          sudo --user="${user}" -- ln -sf ${cfg.configSource} "${cfg.configFile}"
         ''}
       '';
 

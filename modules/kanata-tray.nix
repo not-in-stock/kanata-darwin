@@ -151,20 +151,20 @@ in
 
     system.activationScripts.postActivation.text = lib.mkAfter ''
       # Create sudo-kanata wrapper
-      sudo --user=${user} -- mkdir -p "${userHome}/.local/bin"
-      sudo --user=${user} -- cp -f ${sudoKanataWrapper} "${userHome}/.local/bin/sudo-kanata"
-      sudo --user=${user} -- chmod +x "${userHome}/.local/bin/sudo-kanata"
+      sudo --user="${user}" -- mkdir -p "${userHome}/.local/bin"
+      sudo --user="${user}" -- cp -f ${sudoKanataWrapper} "${userHome}/.local/bin/sudo-kanata"
+      sudo --user="${user}" -- chmod +x "${userHome}/.local/bin/sudo-kanata"
 
       # Install kanata-tray TOML config
-      sudo --user=${user} -- mkdir -p "${userHome}/Library/Application Support/kanata-tray"
-      sudo --user=${user} -- cp -f ${trayConfig} "${userHome}/Library/Application Support/kanata-tray/kanata-tray.toml"
+      sudo --user="${user}" -- mkdir -p "${userHome}/Library/Application Support/kanata-tray"
+      sudo --user="${user}" -- cp -f ${trayConfig} "${userHome}/Library/Application Support/kanata-tray/kanata-tray.toml"
 
       ${lib.optionalString (cfg.kanata-tray.icons != { }) ''
         # Install layer icons
-        sudo --user=${user} -- mkdir -p "${userHome}/Library/Application Support/kanata-tray/icons"
+        sudo --user="${user}" -- mkdir -p "${userHome}/Library/Application Support/kanata-tray/icons"
         ${lib.concatStringsSep "\n" (lib.mapAttrsToList (
           name: path:
-          ''sudo --user=${user} -- cp -f ${path} "${userHome}/Library/Application Support/kanata-tray/icons/${builtins.baseNameOf path}"''
+          ''sudo --user="${user}" -- cp -f ${path} "${userHome}/Library/Application Support/kanata-tray/icons/${builtins.baseNameOf path}"''
         ) cfg.kanata-tray.icons)}
       ''}
     '';

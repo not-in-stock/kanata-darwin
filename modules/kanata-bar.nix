@@ -104,8 +104,8 @@ in
 
     system.activationScripts.postActivation.text = lib.mkAfter ''
       # Install kanata-bar config
-      sudo --user=${user} -- mkdir -p "${userHome}/.config/kanata-bar"
-      sudo --user=${user} -- cp -f ${barConfig} "${userHome}/.config/kanata-bar/config.toml"
+      sudo --user="${user}" -- mkdir -p "${userHome}/.config/kanata-bar"
+      sudo --user="${user}" -- cp -f ${barConfig} "${userHome}/.config/kanata-bar/config.toml"
     '';
 
     launchd.user.agents.kanata-bar = lib.mkIf cfg.kanata-bar.autostart {
