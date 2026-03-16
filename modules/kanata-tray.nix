@@ -61,6 +61,16 @@ let
       ''
   );
 
+  # kanata-tray connects to "localhost" which Go resolves to [::1] (IPv6 first),
+  # but kanata listens on 127.0.0.1 (IPv4 only). Patch to use 127.0.0.1 directly.
+  # https://github.com/rszyma/kanata-tray/issues/XXX
+  kanata-tray-patched = (kanata-tray.packages.${pkgs.stdenv.hostPlatform.system}.kanata-tray).overrideAttrs (old: {
+    postPatch = (old.postPatch or "") + ''
+      substituteInPlace runner/tcp_client/tcp_client.go \
+        --replace-fail '"localhost:%d"' '"127.0.0.1:%d"'
+    '';
+  });
+
   kanata-icon = pkgs.fetchurl {
     url = "https://raw.githubusercontent.com/jtroo/kanata/refs/heads/main/assets/kanata-icon.svg";
     hash = "sha256-wq2wNj8Imc2xIO5poCXM4EcN42F2cP2wESTtOHbSFNs=";
@@ -114,7 +124,7 @@ in
     enable = lib.mkEnableOption "kanata-tray GUI launcher";
     package = lib.mkOption {
       type = lib.types.package;
-      default = kanata-tray.packages.${pkgs.stdenv.hostPlatform.system}.kanata-tray;
+      default = kanata-tray-patched;
       description = "The kanata-tray package.";
     };
     autostart = lib.mkOption {
