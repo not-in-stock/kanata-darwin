@@ -131,7 +131,7 @@ in
     launchd.user.agents.kanata-bar = lib.mkIf (!cfg.smapp && cfg.kanata-bar.autostart) {
       serviceConfig =
         {
-          Label = "com.kanata-bar";
+          Label = "com.kanata-bar.launchd";
           ProgramArguments = [
             "${cfg.kanata-bar.package}/Applications/Kanata Bar.app/Contents/MacOS/kanata-bar"
             "--config-file"

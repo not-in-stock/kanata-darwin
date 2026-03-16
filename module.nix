@@ -96,6 +96,28 @@ in
         /usr/bin/pkill -x kanata-tray 2>/dev/null && echo "kanata: stopped running kanata-tray process" || true
         /usr/bin/pkill -x kanata-bar 2>/dev/null && echo "kanata: stopped running kanata-bar process" || true
       '';
+
+      # Clean up stale launchd agents after nix-darwin has reconciled launchd state.
+      # Only removes labels not used by the current configuration.
+      system.activationScripts.postActivation.text =
+        let
+          # Determine which labels are active in current config
+          activeLabels =
+            lib.optional (cfg.enable && cfg.kanata-bar.enable && cfg.kanata-bar.autostart && !cfg.smapp) "com.kanata-bar.launchd"
+            ++ lib.optional (cfg.enable && cfg.kanata-bar.enable && cfg.kanata-bar.autostart && cfg.smapp) "com.kanata-bar.agent"
+            ++ lib.optional (cfg.enable && cfg.kanata-tray.enable && cfg.kanata-tray.autostart && !cfg.smapp) "org.kanata.tray.launchd"
+            ++ lib.optional (cfg.enable && cfg.kanata-tray.enable && cfg.kanata-tray.autostart && cfg.smapp) "org.kanata.tray.agent"
+            ++ lib.optional (cfg.enable && cfg.daemon.enable) "org.kanata.daemon";
+          allLabels = [ "com.kanata-bar" "com.kanata-bar.launchd" "com.kanata-bar.agent" "org.kanata.tray" "org.kanata.tray.launchd" "org.kanata.tray.agent" "org.kanata.daemon" ];
+          staleLabels = lib.subtractLists activeLabels allLabels;
+        in
+        lib.optionalString (staleLabels != []) ''
+          for label in ${lib.concatStringsSep " " staleLabels}; do
+            if launchctl list "$label" &>/dev/null; then
+              launchctl remove "$label" 2>/dev/null && echo "kanata: removed stale $label agent" || true
+            fi
+          done
+        '';
     }
 
     (lib.mkIf cfg.enable {

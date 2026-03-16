@@ -190,7 +190,7 @@ in
     launchd.user.agents.kanata-tray = lib.mkIf (!cfg.smapp && cfg.kanata-tray.autostart) {
       serviceConfig =
         {
-          Label = "org.kanata.tray";
+          Label = "org.kanata.tray.launchd";
           ProgramArguments = [ "${kanata-tray-app}/Applications/Kanata Tray.app/Contents/MacOS/kanata-tray" ];
           RunAtLoad = true;
           KeepAlive = false;
