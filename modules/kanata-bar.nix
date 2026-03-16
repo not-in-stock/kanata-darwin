@@ -1,4 +1,3 @@
-{ darwin-smapp }:
 {
   config,
   lib,

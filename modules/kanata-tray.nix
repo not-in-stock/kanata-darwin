@@ -1,4 +1,4 @@
-{ kanata-tray, darwin-smapp }:
+{ kanata-tray }:
 {
   config,
   lib,
@@ -63,7 +63,7 @@ let
 
   # kanata-tray connects to "localhost" which Go resolves to [::1] (IPv6 first),
   # but kanata listens on 127.0.0.1 (IPv4 only). Patch to use 127.0.0.1 directly.
-  # https://github.com/rszyma/kanata-tray/issues/XXX
+  # TODO: remove patch when fixed upstream
   kanata-tray-patched = (kanata-tray.packages.${pkgs.stdenv.hostPlatform.system}.kanata-tray).overrideAttrs (old: {
     postPatch = (old.postPatch or "") + ''
       substituteInPlace runner/tcp_client/tcp_client.go \

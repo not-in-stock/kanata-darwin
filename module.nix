@@ -28,8 +28,8 @@ in
 {
   imports = [
     (import ./modules/daemon.nix)
-    (import ./modules/kanata-tray.nix { inherit kanata-tray darwin-smapp; })
-    (import ./modules/kanata-bar.nix { inherit darwin-smapp; })
+    (import ./modules/kanata-tray.nix { inherit kanata-tray; })
+    (import ./modules/kanata-bar.nix)
     darwin-smapp.darwinModules.default
   ];
 
