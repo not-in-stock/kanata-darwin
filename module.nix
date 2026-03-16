@@ -1,4 +1,4 @@
-{ kanata-tray }:
+{ kanata-tray, darwin-smapp }:
 {
   config,
   lib,
@@ -28,8 +28,9 @@ in
 {
   imports = [
     (import ./modules/daemon.nix)
-    (import ./modules/kanata-tray.nix { inherit kanata-tray; })
-    (import ./modules/kanata-bar.nix)
+    (import ./modules/kanata-tray.nix { inherit kanata-tray darwin-smapp; })
+    (import ./modules/kanata-bar.nix { inherit darwin-smapp; })
+    darwin-smapp.darwinModules.default
   ];
 
   options.services.kanata = {
@@ -71,6 +72,17 @@ in
 
     package = lib.mkPackageOption pkgs "kanata" {
       default = "kanata-with-cmd";
+    };
+
+    smapp = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = ''
+        Use SMAppService wrapper for LaunchAgent registration.
+        When enabled, kanata-bar and kanata-tray appear with proper icons in
+        System Settings > Login Items instead of generic "sh" entries.
+        Set to false for legacy launchd behavior.
+      '';
     };
   };
 

@@ -7,6 +7,10 @@
       url = "github:rszyma/kanata-tray";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    darwin-smapp = {
+      url = "github:not-in-stock/darwin-smapp";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -14,6 +18,7 @@
       self,
       nixpkgs,
       kanata-tray,
+      darwin-smapp,
       ...
     }:
     let
@@ -28,7 +33,7 @@
       forDocsSystems = nixpkgs.lib.genAttrs docsSystems;
     in
     {
-      darwinModules.default = import ./module.nix { inherit kanata-tray; };
+      darwinModules.default = import ./module.nix { inherit kanata-tray darwin-smapp; };
 
       lib.mkLayerIcons =
         pkgs:
@@ -81,7 +86,7 @@
         let
           pkgs = nixpkgs.legacyPackages.${system};
           docs = import ./doc {
-            inherit pkgs kanata-tray;
+            inherit pkgs kanata-tray darwin-smapp;
             revision = self.rev or self.dirtyRev or "main";
           };
         in

@@ -1,3 +1,4 @@
+{ darwin-smapp }:
 {
   config,
   lib,
@@ -108,7 +109,26 @@ in
       sudo --user="${user}" -- cp -f ${barConfig} "${userHome}/.config/kanata-bar/config.toml"
     '';
 
-    launchd.user.agents.kanata-bar = lib.mkIf cfg.kanata-bar.autostart {
+    # SMAppService wrapper — proper icon in Login Items
+    services.darwin-smapp = lib.mkIf (cfg.smapp && cfg.kanata-bar.autostart) {
+      enable = true;
+      bundles.kanata-bar = {
+        bundleIdentifier = "com.kanata-bar.smapp";
+        bundleName = "Kanata Bar";
+        icon = "${cfg.kanata-bar.package}/Applications/Kanata Bar.app";
+        services."com.kanata-bar.agent" = {
+          command = "exec ${cfg.kanata-bar.package}/Applications/Kanata\\ Bar.app/Contents/MacOS/kanata-bar --config-file ${userHome}/.config/kanata-bar/config.toml";
+          extraPlistKeys = {
+            KeepAlive = false;
+            StandardOutPath = "/tmp/kanata-bar.log";
+            StandardErrorPath = "/tmp/kanata-bar.err";
+          };
+        };
+      };
+    };
+
+    # Legacy launchd — fallback when smapp is disabled
+    launchd.user.agents.kanata-bar = lib.mkIf (!cfg.smapp && cfg.kanata-bar.autostart) {
       serviceConfig =
         {
           Label = "com.kanata-bar";

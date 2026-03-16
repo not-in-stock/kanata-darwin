@@ -1,4 +1,4 @@
-{ kanata-tray }:
+{ kanata-tray, darwin-smapp }:
 {
   config,
   lib,
@@ -169,7 +169,25 @@ in
       ''}
     '';
 
-    launchd.user.agents.kanata-tray = lib.mkIf cfg.kanata-tray.autostart {
+    # SMAppService wrapper — proper icon in Login Items
+    services.darwin-smapp = lib.mkIf (cfg.smapp && cfg.kanata-tray.autostart) {
+      enable = true;
+      bundles.kanata-tray = {
+        bundleIdentifier = "org.kanata.tray.smapp";
+        bundleName = "Kanata Tray";
+        services."org.kanata.tray.agent" = {
+          command = "exec ${kanata-tray-app}/Applications/Kanata\\ Tray.app/Contents/MacOS/kanata-tray";
+          extraPlistKeys = {
+            KeepAlive = false;
+            StandardOutPath = "/tmp/kanata-tray.log";
+            StandardErrorPath = "/tmp/kanata-tray.err";
+          };
+        };
+      };
+    };
+
+    # Legacy launchd — fallback when smapp is disabled
+    launchd.user.agents.kanata-tray = lib.mkIf (!cfg.smapp && cfg.kanata-tray.autostart) {
       serviceConfig =
         {
           Label = "org.kanata.tray";

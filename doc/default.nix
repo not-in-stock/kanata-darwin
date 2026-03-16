@@ -1,6 +1,7 @@
 {
   pkgs,
   kanata-tray,
+  darwin-smapp,
   revision ? "main",
 }:
 
@@ -10,7 +11,7 @@ let
   # Evaluate the module to extract options
   eval = lib.evalModules {
     modules = [
-      (import ../module.nix { inherit kanata-tray; })
+      (import ../module.nix { inherit kanata-tray darwin-smapp; })
       {
         _module.args = { inherit pkgs; };
         _module.check = false;

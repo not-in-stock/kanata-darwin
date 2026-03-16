@@ -1,5 +1,22 @@
 {
   "nodes": {
+    "darwin-smapp": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1773621909,
+        "narHash": "sha256-9J58+tY3Dp2Q59czdjn1ueUFawBIVvQNJJiB3Pg5Ltk=",
+        "path": "/Users/andrey/workspace/darwin-smapp",
+        "type": "path"
+      },
+      "original": {
+        "path": "/Users/andrey/workspace/darwin-smapp",
+        "type": "path"
+      }
+    },
     "flake-utils": {
       "inputs": {
         "systems": "systems"
@@ -57,6 +74,7 @@
     },
     "root": {
       "inputs": {
+        "darwin-smapp": "darwin-smapp",
         "kanata-tray": "kanata-tray",
         "nixpkgs": "nixpkgs"
       }
