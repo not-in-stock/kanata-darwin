@@ -120,7 +120,7 @@ All options are under `services.kanata`.
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `daemon.enable` | bool | `false` | Enable headless launchd service |
-| `daemon.launchd` | attrs | `{}` | Extra launchd service config attributes |
+| `daemon.extraLaunchdConfig` | attrs | `{}` | Extra launchd plist attributes (e.g. `ThrottleInterval`, `KeepAlive`) |
 
 ### kanata-tray
 
@@ -129,7 +129,8 @@ All options are under `services.kanata`.
 | `kanata-tray.enable` | bool | `false` | Enable kanata-tray GUI launcher |
 | `kanata-tray.package` | package | from kanata-tray flake | The kanata-tray package |
 | `kanata-tray.autostart` | bool | `true` | Create launchd agent for auto-start at login |
-| `kanata-tray.launchd` | attrs | `{}` | Extra launchd service config attributes |
+| `kanata-tray.smapp` | bool | `true` | Use SMAppService for Login Items integration (proper icon in System Settings) |
+| `kanata-tray.extraLaunchdConfig` | attrs | `{}` | Extra launchd plist attributes, applied in both smapp and legacy modes |
 | `kanata-tray.icons` | attrsOf path | `{}` | Layer icon files (use `mkLayerIcons` to generate) |
 | `kanata-tray.settings` | TOML attrs | `{}` | Extra settings merged into `kanata-tray.toml` |
 
@@ -140,7 +141,8 @@ All options are under `services.kanata`.
 | `kanata-bar.enable` | bool | `false` | Enable kanata-bar GUI launcher |
 | `kanata-bar.package` | package | fetched from GitHub Releases | The kanata-bar .app package |
 | `kanata-bar.autostart` | bool | `true` | Create launchd agent for auto-start at login |
-| `kanata-bar.launchd` | attrs | `{}` | Extra launchd service config attributes |
+| `kanata-bar.smapp` | bool | `true` | Use SMAppService for Login Items integration (proper icon in System Settings) |
+| `kanata-bar.extraLaunchdConfig` | attrs | `{}` | Extra launchd plist attributes, applied in both smapp and legacy modes |
 | `kanata-bar.settings` | TOML attrs | `{}` | Settings merged into `config.toml` |
 | `kanata-bar.icons` | attrsOf path | `{}` | Layer icon files (use `mkLayerIcons` to generate) |
 
