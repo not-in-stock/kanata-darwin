@@ -76,6 +76,16 @@ in
         When false, you can start it manually from /Applications/Nix Apps/.
       '';
     };
+    smapp = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = ''
+        Use SMAppService wrapper for LaunchAgent registration.
+        When enabled, kanata-bar appears with its proper icon in
+        System Settings > Login Items instead of a generic "sh" entry.
+        Set to false for legacy launchd behavior.
+      '';
+    };
     launchd = lib.mkOption {
       type = lib.types.attrsOf lib.types.anything;
       default = { };
@@ -110,7 +120,7 @@ in
     '';
 
     # SMAppService wrapper — proper icon in Login Items
-    services.darwin-smapp = lib.mkIf (cfg.smapp && cfg.kanata-bar.autostart) {
+    services.darwin-smapp = lib.mkIf (cfg.kanata-bar.smapp && cfg.kanata-bar.autostart) {
       enable = true;
       bundles.kanata-bar = {
         bundleIdentifier = "com.kanata-bar.smapp";
@@ -128,7 +138,7 @@ in
     };
 
     # Legacy launchd — fallback when smapp is disabled
-    launchd.user.agents.kanata-bar = lib.mkIf (!cfg.smapp && cfg.kanata-bar.autostart) {
+    launchd.user.agents.kanata-bar = lib.mkIf (!cfg.kanata-bar.smapp && cfg.kanata-bar.autostart) {
       serviceConfig =
         {
           Label = "com.kanata-bar.launchd";

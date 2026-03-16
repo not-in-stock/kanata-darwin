@@ -74,17 +74,7 @@ in
       default = "kanata-with-cmd";
     };
 
-    smapp = lib.mkOption {
-      type = lib.types.bool;
-      default = true;
-      description = ''
-        Use SMAppService wrapper for LaunchAgent registration.
-        When enabled, kanata-bar and kanata-tray appear with proper icons in
-        System Settings > Login Items instead of generic "sh" entries.
-        Set to false for legacy launchd behavior.
-      '';
-    };
-  };
+};
 
   config = lib.mkMerge [
     # Always stop kanata before launchd services are reconfigured — even when
@@ -103,10 +93,10 @@ in
         let
           # Determine which labels are active in current config
           activeLabels =
-            lib.optional (cfg.enable && cfg.kanata-bar.enable && cfg.kanata-bar.autostart && !cfg.smapp) "com.kanata-bar.launchd"
-            ++ lib.optional (cfg.enable && cfg.kanata-bar.enable && cfg.kanata-bar.autostart && cfg.smapp) "com.kanata-bar.agent"
-            ++ lib.optional (cfg.enable && cfg.kanata-tray.enable && cfg.kanata-tray.autostart && !cfg.smapp) "org.kanata.tray.launchd"
-            ++ lib.optional (cfg.enable && cfg.kanata-tray.enable && cfg.kanata-tray.autostart && cfg.smapp) "org.kanata.tray.agent"
+            lib.optional (cfg.enable && cfg.kanata-bar.enable && cfg.kanata-bar.autostart && !cfg.kanata-bar.smapp) "com.kanata-bar.launchd"
+            ++ lib.optional (cfg.enable && cfg.kanata-bar.enable && cfg.kanata-bar.autostart && cfg.kanata-bar.smapp) "com.kanata-bar.agent"
+            ++ lib.optional (cfg.enable && cfg.kanata-tray.enable && cfg.kanata-tray.autostart && !cfg.kanata-tray.smapp) "org.kanata.tray.launchd"
+            ++ lib.optional (cfg.enable && cfg.kanata-tray.enable && cfg.kanata-tray.autostart && cfg.kanata-tray.smapp) "org.kanata.tray.agent"
             ++ lib.optional (cfg.enable && cfg.daemon.enable) "org.kanata.daemon";
           allLabels = [ "com.kanata-bar" "com.kanata-bar.launchd" "com.kanata-bar.agent" "org.kanata.tray" "org.kanata.tray.launchd" "org.kanata.tray.agent" "org.kanata.daemon" ];
           staleLabels = lib.subtractLists activeLabels allLabels;

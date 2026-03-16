@@ -135,6 +135,16 @@ in
         When false, the .app bundle is still available in /Applications/Nix Apps/.
       '';
     };
+    smapp = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = ''
+        Use SMAppService wrapper for LaunchAgent registration.
+        When enabled, kanata-tray appears with its proper icon in
+        System Settings > Login Items instead of a generic "sh" entry.
+        Set to false for legacy launchd behavior.
+      '';
+    };
     launchd = lib.mkOption {
       type = lib.types.attrsOf lib.types.anything;
       default = { };
@@ -180,7 +190,7 @@ in
     '';
 
     # SMAppService wrapper — proper icon in Login Items
-    services.darwin-smapp = lib.mkIf (cfg.smapp && cfg.kanata-tray.autostart) {
+    services.darwin-smapp = lib.mkIf (cfg.kanata-tray.smapp && cfg.kanata-tray.autostart) {
       enable = true;
       bundles.kanata-tray = {
         bundleIdentifier = "org.kanata.tray.smapp";
@@ -197,7 +207,7 @@ in
     };
 
     # Legacy launchd — fallback when smapp is disabled
-    launchd.user.agents.kanata-tray = lib.mkIf (!cfg.smapp && cfg.kanata-tray.autostart) {
+    launchd.user.agents.kanata-tray = lib.mkIf (!cfg.kanata-tray.smapp && cfg.kanata-tray.autostart) {
       serviceConfig =
         {
           Label = "org.kanata.tray.launchd";
