@@ -81,6 +81,19 @@
         in
         nixpkgs.lib.mapAttrs (name: _: "${iconsPkg}/${name}.png") labels;
 
+      # Module tests require darwin packages (apple-sdk, etc.)
+      checks = nixpkgs.lib.genAttrs [ "aarch64-darwin" "x86_64-darwin" ] (
+        system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+        in
+        {
+          module-tests = import ./tests {
+            inherit pkgs kanata-tray darwin-smapp;
+          };
+        }
+      );
+
       packages = forDocsSystems (
         system:
         let
