@@ -37,20 +37,24 @@ let
     options = eval.options;
     transformOptions =
       opt:
-      opt
-      // {
-        declarations = map (
-          decl:
-          let
-            declStr = toString decl;
-            prefix = toString ./..;
-          in
-          if lib.hasPrefix prefix declStr then
-            gitHubDeclaration (lib.removePrefix "/" (lib.removePrefix prefix declStr))
-          else
-            decl
-        ) opt.declarations;
-      };
+      # Filter out options from imported dependencies (darwin-smapp)
+      if lib.hasPrefix "services.darwin-smapp" opt.name then
+        opt // { visible = false; }
+      else
+        opt
+        // {
+          declarations = map (
+            decl:
+            let
+              declStr = toString decl;
+              prefix = toString ./..;
+            in
+            if lib.hasPrefix prefix declStr then
+              gitHubDeclaration (lib.removePrefix "/" (lib.removePrefix prefix declStr))
+            else
+              decl
+          ) opt.declarations;
+        };
   };
 
 in

@@ -7,14 +7,17 @@
         ]
       },
       "locked": {
-        "lastModified": 1773621909,
-        "narHash": "sha256-9J58+tY3Dp2Q59czdjn1ueUFawBIVvQNJJiB3Pg5Ltk=",
-        "path": "/Users/andrey/workspace/darwin-smapp",
-        "type": "path"
+        "lastModified": 1773622597,
+        "narHash": "sha256-HwLr0QH3Ojyrve8WebfR8XxOODj0ll+mO1b6i4R5IpA=",
+        "owner": "not-in-stock",
+        "repo": "darwin-smapp",
+        "rev": "ed16bea907c37cedf4d0b09c4dc55a2be32f9b58",
+        "type": "github"
       },
       "original": {
-        "path": "/Users/andrey/workspace/darwin-smapp",
-        "type": "path"
+        "owner": "not-in-stock",
+        "repo": "darwin-smapp",
+        "type": "github"
       }
     },
     "flake-utils": {
