@@ -15,10 +15,13 @@ in
 {
   options.services.kanata.daemon = {
     enable = lib.mkEnableOption "headless kanata launchd service";
-    launchd = lib.mkOption {
+    extraLaunchdConfig = lib.mkOption {
       type = lib.types.attrsOf lib.types.anything;
       default = { };
-      description = "Extra attributes shallow-merged into the launchd service config (nested keys are replaced, not deep-merged).";
+      description = ''
+        Extra launchd plist keys (e.g. KeepAlive, ThrottleInterval).
+        Shallow-merged (nested keys are replaced, not deep-merged).
+      '';
     };
   };
 
@@ -74,7 +77,7 @@ in
           SessionCreate = true;
           ThrottleInterval = 3;
         }
-        // cfg.daemon.launchd;
+        // cfg.daemon.extraLaunchdConfig;
     };
 
     # daemon + sudoers=true: user agent via sudo NOPASSWD (no TCC hack)
@@ -95,7 +98,7 @@ in
           StandardErrorPath = "/tmp/kanata.err";
           ThrottleInterval = 3;
         }
-        // cfg.daemon.launchd;
+        // cfg.daemon.extraLaunchdConfig;
     };
   };
 }

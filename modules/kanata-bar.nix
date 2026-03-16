@@ -85,10 +85,13 @@ in
         Set to false for legacy launchd behavior.
       '';
     };
-    launchd = lib.mkOption {
+    extraLaunchdConfig = lib.mkOption {
       type = lib.types.attrsOf lib.types.anything;
       default = { };
-      description = "Extra attributes shallow-merged into the launchd service config (nested keys are replaced, not deep-merged).";
+      description = ''
+        Extra launchd plist keys (e.g. KeepAlive, ThrottleInterval).
+        Applied in both smapp and legacy modes. Shallow-merged (nested keys are replaced, not deep-merged).
+      '';
     };
     settings = lib.mkOption {
       type = tomlFormat.type;
@@ -131,7 +134,7 @@ in
             KeepAlive = false;
             StandardOutPath = "/tmp/kanata-bar.log";
             StandardErrorPath = "/tmp/kanata-bar.err";
-          };
+          } // cfg.kanata-bar.extraLaunchdConfig;
         };
       };
     };
@@ -151,7 +154,7 @@ in
           StandardOutPath = "/tmp/kanata-bar.log";
           StandardErrorPath = "/tmp/kanata-bar.err";
         }
-        // cfg.kanata-bar.launchd;
+        // cfg.kanata-bar.extraLaunchdConfig;
     };
   };
 }
