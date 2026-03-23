@@ -135,22 +135,12 @@ in
         When false, the .app bundle is still available in /Applications/Nix Apps/.
       '';
     };
-    smapp = lib.mkOption {
-      type = lib.types.bool;
-      default = true;
-      description = ''
-        Use SMAppService wrapper for LaunchAgent registration.
-        When enabled, kanata-tray appears with its proper icon in
-        System Settings > Login Items instead of a generic "sh" entry.
-        Set to false for legacy launchd behavior.
-      '';
-    };
     extraLaunchdConfig = lib.mkOption {
       type = lib.types.attrsOf lib.types.anything;
       default = { };
       description = ''
         Extra launchd plist keys (e.g. KeepAlive, ThrottleInterval).
-        Applied in both smapp and legacy modes. Shallow-merged (nested keys are replaced, not deep-merged).
+        Shallow-merged (nested keys are replaced, not deep-merged).
       '';
     };
     icons = lib.mkOption {
@@ -192,25 +182,7 @@ in
       ''}
     '';
 
-    # SMAppService wrapper — proper icon in Login Items
-    services.darwin-smapp = lib.mkIf (cfg.kanata-tray.smapp && cfg.kanata-tray.autostart) {
-      enable = true;
-      bundles.kanata-tray = {
-        bundleIdentifier = "org.kanata.tray.smapp";
-        bundleName = "Kanata Tray";
-        services."org.kanata.tray.agent" = {
-          command = "exec ${kanata-tray-app}/Applications/Kanata\\ Tray.app/Contents/MacOS/kanata-tray";
-          extraPlistKeys = {
-            KeepAlive = false;
-            StandardOutPath = "/tmp/kanata-tray.log";
-            StandardErrorPath = "/tmp/kanata-tray.err";
-          } // cfg.kanata-tray.extraLaunchdConfig;
-        };
-      };
-    };
-
-    # Legacy launchd — fallback when smapp is disabled
-    launchd.user.agents.kanata-tray = lib.mkIf (!cfg.kanata-tray.smapp && cfg.kanata-tray.autostart) {
+    launchd.user.agents.kanata-tray = lib.mkIf cfg.kanata-tray.autostart {
       serviceConfig =
         {
           Label = "org.kanata.tray.launchd";

@@ -75,22 +75,12 @@ in
         When false, you can start it manually from /Applications/Nix Apps/.
       '';
     };
-    smapp = lib.mkOption {
-      type = lib.types.bool;
-      default = true;
-      description = ''
-        Use SMAppService wrapper for LaunchAgent registration.
-        When enabled, kanata-bar appears with its proper icon in
-        System Settings > Login Items instead of a generic "sh" entry.
-        Set to false for legacy launchd behavior.
-      '';
-    };
     extraLaunchdConfig = lib.mkOption {
       type = lib.types.attrsOf lib.types.anything;
       default = { };
       description = ''
         Extra launchd plist keys (e.g. KeepAlive, ThrottleInterval).
-        Applied in both smapp and legacy modes. Shallow-merged (nested keys are replaced, not deep-merged).
+        Shallow-merged (nested keys are replaced, not deep-merged).
       '';
     };
     settings = lib.mkOption {
@@ -121,26 +111,7 @@ in
       sudo --user="${user}" -- cp -f ${barConfig} "${userHome}/.config/kanata-bar/config.toml"
     '';
 
-    # SMAppService wrapper — proper icon in Login Items
-    services.darwin-smapp = lib.mkIf (cfg.kanata-bar.smapp && cfg.kanata-bar.autostart) {
-      enable = true;
-      bundles.kanata-bar = {
-        bundleIdentifier = "com.kanata-bar.smapp";
-        bundleName = "Kanata Bar";
-        icon = "${cfg.kanata-bar.package}/Applications/Kanata Bar.app";
-        services."com.kanata-bar.agent" = {
-          command = "exec ${cfg.kanata-bar.package}/Applications/Kanata\\ Bar.app/Contents/MacOS/kanata-bar --config-file ${userHome}/.config/kanata-bar/config.toml";
-          extraPlistKeys = {
-            KeepAlive = false;
-            StandardOutPath = "/tmp/kanata-bar.log";
-            StandardErrorPath = "/tmp/kanata-bar.err";
-          } // cfg.kanata-bar.extraLaunchdConfig;
-        };
-      };
-    };
-
-    # Legacy launchd — fallback when smapp is disabled
-    launchd.user.agents.kanata-bar = lib.mkIf (!cfg.kanata-bar.smapp && cfg.kanata-bar.autostart) {
+    launchd.user.agents.kanata-bar = lib.mkIf cfg.kanata-bar.autostart {
       serviceConfig =
         {
           Label = "com.kanata-bar.launchd";

@@ -1,7 +1,6 @@
 {
   pkgs,
   kanata-tray,
-  darwin-smapp,
   revision ? "main",
 }:
 
@@ -11,7 +10,7 @@ let
   # Evaluate the module to extract options
   eval = lib.evalModules {
     modules = [
-      (import ../module.nix { inherit kanata-tray darwin-smapp; })
+      (import ../module.nix { inherit kanata-tray; })
       {
         _module.args = { inherit pkgs; };
         _module.check = false;
@@ -37,11 +36,7 @@ let
     options = eval.options;
     transformOptions =
       opt:
-      # Filter out options from imported dependencies (darwin-smapp)
-      if lib.hasPrefix "services.darwin-smapp" opt.name then
-        opt // { visible = false; }
-      else
-        opt
+      opt
         // {
           declarations = map (
             decl:

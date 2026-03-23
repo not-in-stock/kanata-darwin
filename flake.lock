@@ -1,25 +1,5 @@
 {
   "nodes": {
-    "darwin-smapp": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1773622597,
-        "narHash": "sha256-HwLr0QH3Ojyrve8WebfR8XxOODj0ll+mO1b6i4R5IpA=",
-        "owner": "not-in-stock",
-        "repo": "darwin-smapp",
-        "rev": "ed16bea907c37cedf4d0b09c4dc55a2be32f9b58",
-        "type": "github"
-      },
-      "original": {
-        "owner": "not-in-stock",
-        "repo": "darwin-smapp",
-        "type": "github"
-      }
-    },
     "flake-utils": {
       "inputs": {
         "systems": "systems"
@@ -77,7 +57,6 @@
     },
     "root": {
       "inputs": {
-        "darwin-smapp": "darwin-smapp",
         "kanata-tray": "kanata-tray",
         "nixpkgs": "nixpkgs"
       }

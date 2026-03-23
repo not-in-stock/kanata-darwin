@@ -1,4 +1,4 @@
-{ kanata-tray, darwin-smapp }:
+{ kanata-tray }:
 {
   config,
   lib,
@@ -30,7 +30,6 @@ in
     (import ./modules/daemon.nix)
     (import ./modules/kanata-tray.nix { inherit kanata-tray; })
     (import ./modules/kanata-bar.nix)
-    darwin-smapp.darwinModules.default
   ];
 
   options.services.kanata = {
@@ -93,12 +92,10 @@ in
         let
           # Determine which labels are active in current config
           activeLabels =
-            lib.optional (cfg.enable && cfg.kanata-bar.enable && cfg.kanata-bar.autostart && !cfg.kanata-bar.smapp) "com.kanata-bar.launchd"
-            ++ lib.optional (cfg.enable && cfg.kanata-bar.enable && cfg.kanata-bar.autostart && cfg.kanata-bar.smapp) "com.kanata-bar.agent"
-            ++ lib.optional (cfg.enable && cfg.kanata-tray.enable && cfg.kanata-tray.autostart && !cfg.kanata-tray.smapp) "org.kanata.tray.launchd"
-            ++ lib.optional (cfg.enable && cfg.kanata-tray.enable && cfg.kanata-tray.autostart && cfg.kanata-tray.smapp) "org.kanata.tray.agent"
+            lib.optional (cfg.enable && cfg.kanata-bar.enable && cfg.kanata-bar.autostart) "com.kanata-bar.launchd"
+            ++ lib.optional (cfg.enable && cfg.kanata-tray.enable && cfg.kanata-tray.autostart) "org.kanata.tray.launchd"
             ++ lib.optional (cfg.enable && cfg.daemon.enable) "org.kanata.daemon";
-          allLabels = [ "com.kanata-bar" "com.kanata-bar.launchd" "com.kanata-bar.agent" "org.kanata.tray" "org.kanata.tray.launchd" "org.kanata.tray.agent" "org.kanata.daemon" ];
+          allLabels = [ "com.kanata-bar" "com.kanata-bar.launchd" "com.kanata-bar.agent" "com.kanata-bar.smapp" "org.kanata.tray" "org.kanata.tray.launchd" "org.kanata.tray.agent" "org.kanata.tray.smapp" "org.kanata.daemon" ];
           staleLabels = lib.subtractLists activeLabels allLabels;
         in
         lib.optionalString (staleLabels != []) ''

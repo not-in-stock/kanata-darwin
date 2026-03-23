@@ -4,7 +4,6 @@
 {
   pkgs,
   kanata-tray,
-  darwin-smapp,
 }:
 
 let
@@ -58,7 +57,7 @@ let
     lib.evalModules {
       modules = [
         darwinStubs
-        (import ../module.nix { inherit kanata-tray darwin-smapp; })
+        (import ../module.nix { inherit kanata-tray; })
         { _module.args = { inherit pkgs; }; }
         configFn
       ];
@@ -92,7 +91,7 @@ let
     enabled-no-launcher = let eval = evalWith { services.kanata.enable = true; };
     in assertionsPass eval;
 
-    # 3. kanata-bar defaults (smapp=true, autostart=true)
+    # 3. kanata-bar defaults (autostart=true)
     kanata-bar-defaults =
       let
         eval = evalWith {
@@ -101,28 +100,9 @@ let
         };
       in
       assert assertionsPass eval;
-      # smapp bundle should be configured
-      assert eval.config.services.darwin-smapp.enable;
-      assert eval.config.services.darwin-smapp.bundles ? kanata-bar;
-      # legacy launchd should NOT be set
-      assert !(eval.config.launchd.user.agents ? kanata-bar);
-      true;
-
-    # 4. kanata-bar legacy mode
-    kanata-bar-legacy =
-      let
-        eval = evalWith {
-          services.kanata.enable = true;
-          services.kanata.kanata-bar.enable = true;
-          services.kanata.kanata-bar.smapp = false;
-        };
-      in
-      assert assertionsPass eval;
-      # legacy launchd should be set
+      # launchd agent should be configured
       assert eval.config.launchd.user.agents ? kanata-bar;
       assert eval.config.launchd.user.agents.kanata-bar.serviceConfig.Label == "com.kanata-bar.launchd";
-      # smapp should NOT be enabled by kanata-bar
-      assert !(eval.config.services.darwin-smapp.bundles ? kanata-bar);
       true;
 
     # 5. kanata-bar without autostart
@@ -135,12 +115,11 @@ let
         };
       in
       assert assertionsPass eval;
-      # no smapp, no launchd
-      assert !(eval.config.services.darwin-smapp.bundles ? kanata-bar);
+      # no launchd agent
       assert !(eval.config.launchd.user.agents ? kanata-bar);
       true;
 
-    # 6. kanata-tray defaults
+    # 6. kanata-tray defaults (autostart=true)
     kanata-tray-defaults =
       let
         eval = evalWith {
@@ -149,27 +128,11 @@ let
         };
       in
       assert assertionsPass eval;
-      assert eval.config.services.darwin-smapp.enable;
-      assert eval.config.services.darwin-smapp.bundles ? kanata-tray;
-      assert !(eval.config.launchd.user.agents ? kanata-tray);
-      true;
-
-    # 7. kanata-tray legacy mode
-    kanata-tray-legacy =
-      let
-        eval = evalWith {
-          services.kanata.enable = true;
-          services.kanata.kanata-tray.enable = true;
-          services.kanata.kanata-tray.smapp = false;
-        };
-      in
-      assert assertionsPass eval;
       assert eval.config.launchd.user.agents ? kanata-tray;
       assert eval.config.launchd.user.agents.kanata-tray.serviceConfig.Label == "org.kanata.tray.launchd";
-      assert !(eval.config.services.darwin-smapp.bundles ? kanata-tray);
       true;
 
-    # 8. kanata-tray without autostart
+    # 7. kanata-tray without autostart
     kanata-tray-no-autostart =
       let
         eval = evalWith {
@@ -179,7 +142,6 @@ let
         };
       in
       assert assertionsPass eval;
-      assert !(eval.config.services.darwin-smapp.bundles ? kanata-tray);
       assert !(eval.config.launchd.user.agents ? kanata-tray);
       true;
 
@@ -284,29 +246,12 @@ let
       assert eval.config.security.sudo.extraConfig == "";
       true;
 
-    # 18. extraLaunchdConfig propagated to smapp
-    extra-launchd-config-smapp =
+    # 18. extraLaunchdConfig propagated to launchd
+    extra-launchd-config =
       let
         eval = evalWith {
           services.kanata.enable = true;
           services.kanata.kanata-bar.enable = true;
-          services.kanata.kanata-bar.extraLaunchdConfig.ThrottleInterval = 5;
-        };
-      in
-      assert assertionsPass eval;
-      let
-        svc = eval.config.services.darwin-smapp.bundles.kanata-bar.services."com.kanata-bar.agent";
-      in
-      assert svc.extraPlistKeys.ThrottleInterval == 5;
-      true;
-
-    # extraLaunchdConfig propagated to legacy
-    extra-launchd-config-legacy =
-      let
-        eval = evalWith {
-          services.kanata.enable = true;
-          services.kanata.kanata-bar.enable = true;
-          services.kanata.kanata-bar.smapp = false;
           services.kanata.kanata-bar.extraLaunchdConfig.ThrottleInterval = 5;
         };
       in
@@ -315,7 +260,7 @@ let
       true;
 
     # 19-22. Stale label cleanup
-    stale-labels-bar-smapp =
+    stale-labels-bar =
       let
         eval = evalWith {
           services.kanata.enable = true;
@@ -323,28 +268,9 @@ let
         };
         text = eval.config.system.activationScripts.postActivation.text;
       in
-      # com.kanata-bar.agent is active, should NOT be cleaned
-      assert !(lib.hasInfix "com.kanata-bar.agent" (
-        # Extract only the stale cleanup part (the for loop)
-        let lines = lib.splitString "\n" text;
-            cleanupLines = lib.filter (l: lib.hasInfix "launchctl remove" l) lines;
-        in lib.concatStringsSep "\n" cleanupLines
-      ));
-      # com.kanata-bar.launchd IS stale
-      assert lib.hasInfix "com.kanata-bar.launchd" text;
-      true;
-
-    stale-labels-bar-legacy =
-      let
-        eval = evalWith {
-          services.kanata.enable = true;
-          services.kanata.kanata-bar.enable = true;
-          services.kanata.kanata-bar.smapp = false;
-        };
-        text = eval.config.system.activationScripts.postActivation.text;
-      in
-      # com.kanata-bar.launchd is active
-      assert lib.hasInfix "com.kanata-bar.agent" text; # stale
+      # com.kanata-bar.launchd is active, stale labels should be cleaned
+      assert lib.hasInfix "com.kanata-bar.agent" text; # stale smapp label
+      assert lib.hasInfix "com.kanata-bar.smapp" text; # stale smapp label
       assert lib.hasInfix "org.kanata.daemon" text; # stale
       true;
 
