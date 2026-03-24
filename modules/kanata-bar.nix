@@ -21,10 +21,11 @@ let
     version = kanata-bar-version;
     src = kanata-bar-zip;
     dontUnpack = true;
-    nativeBuildInputs = [ pkgs.unzip ];
+    dontStrip = true;
+    dontPatchELF = true;
     installPhase = ''
       mkdir -p "$out/Applications"
-      unzip $src -d "$out/Applications"
+      /usr/bin/ditto -x -k $src "$out/Applications"
     '';
   };
 
