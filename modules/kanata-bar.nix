@@ -11,10 +11,10 @@ let
   userHome = "/Users/${user}";
   tomlFormat = pkgs.formats.toml { };
 
-  kanata-bar-version = "1.1.7";
+  kanata-bar-version = "1.1.8";
   kanata-bar-zip = pkgs.fetchurl {
     url = "https://github.com/not-in-stock/kanata-bar/releases/download/v${kanata-bar-version}/kanata-bar.app.zip";
-    hash = "sha256-Os9dMfhq5JMgGNMPepcQNIuzCqPmkx85eMF1Cesb1Gs=";
+    hash = "sha256-SEwsDclY/fHlwPH1oWl7nAMEtCd20eZF2dgnRbXoEEs=";
   };
   kanata-bar-app = pkgs.stdenv.mkDerivation {
     pname = "kanata-bar-app";
