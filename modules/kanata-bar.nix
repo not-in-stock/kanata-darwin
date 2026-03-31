@@ -117,12 +117,13 @@ in
         {
           Label = "com.kanata-bar.launchd";
           ProgramArguments = [
-            "${cfg.kanata-bar.package}/Applications/Kanata Bar.app/Contents/MacOS/kanata-bar"
+            "/Applications/Nix Apps/Kanata Bar.app/Contents/MacOS/kanata-bar"
             "--config-file"
             "${userHome}/.config/kanata-bar/config.toml"
           ];
           RunAtLoad = true;
           KeepAlive = false;
+          ProcessType = "Interactive";
           StandardOutPath = "/tmp/kanata-bar.log";
           StandardErrorPath = "/tmp/kanata-bar.err";
         }
