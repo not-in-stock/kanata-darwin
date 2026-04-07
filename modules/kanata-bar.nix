@@ -110,6 +110,13 @@ in
       # Install kanata-bar config
       sudo --user="${user}" -- mkdir -p "${userHome}/.config/kanata-bar"
       sudo --user="${user}" -- cp -f ${barConfig} "${userHome}/.config/kanata-bar/config.toml"
+
+      # Restart kanata-bar (killed in preActivation; nix-darwin skips
+      # launchd reload when the plist is unchanged).
+      ${lib.optionalString cfg.kanata-bar.autostart ''
+        launchctl kickstart -k "gui/$(id -u ${user})/com.kanata-bar.launchd" 2>/dev/null \
+          && echo "kanata-bar: restarted" || true
+      ''}
     '';
 
     launchd.user.agents.kanata-bar = lib.mkIf cfg.kanata-bar.autostart {
