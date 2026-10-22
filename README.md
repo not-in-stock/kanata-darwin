@@ -2,10 +2,10 @@
 
 Declarative [nix-darwin](https://github.com/LnL7/nix-darwin) module for [kanata](https://github.com/jtroo/kanata) keyboard remapper on macOS.
 
-Handles everything needed to run kanata on macOS:
+Handles the macOS-specific setup and lets you run kanata one of three ways — or manually:
 - Installs and activates the [Karabiner DriverKit VirtualHIDDevice](https://github.com/pqrs-org/Karabiner-DriverKit-VirtualHIDDevice) (required for HID on macOS)
 - Configures launchd services, sudoers, and TCC permissions
-- Optionally integrates [kanata-bar](https://github.com/not-in-stock/kanata-bar) or [kanata-tray](https://github.com/rszyma/kanata-tray) GUI launchers
+- Runs kanata as a menu-bar app ([kanata-bar](https://github.com/not-in-stock/kanata-bar)), a tray app ([kanata-tray](https://github.com/rszyma/kanata-tray)), or a headless daemon — pick at most one, or none to start it yourself
 
 ## Usage
 
@@ -46,7 +46,7 @@ The module provides three launch submodules. Enable at most one (or none for man
 
 ### kanata-bar (recommended)
 
-Native macOS menu bar app with TouchID support, layer icons, and auto-restart:
+Native macOS menu bar app — see the active layer at a glance and control kanata from the menu:
 
 ```nix
 services.kanata = {
@@ -129,8 +129,7 @@ All options are under `services.kanata`.
 | `kanata-tray.enable` | bool | `false` | Enable kanata-tray GUI launcher |
 | `kanata-tray.package` | package | from kanata-tray flake | The kanata-tray package |
 | `kanata-tray.autostart` | bool | `true` | Create launchd agent for auto-start at login |
-| `kanata-tray.smapp` | bool | `true` | Use SMAppService for Login Items integration (proper icon in System Settings) |
-| `kanata-tray.extraLaunchdConfig` | attrs | `{}` | Extra launchd plist attributes, applied in both smapp and legacy modes |
+| `kanata-tray.extraLaunchdConfig` | attrs | `{}` | Extra launchd plist attributes for the agent |
 | `kanata-tray.icons` | attrsOf path | `{}` | Layer icon files (use `mkLayerIcons` to generate) |
 | `kanata-tray.settings` | TOML attrs | `{}` | Extra settings merged into `kanata-tray.toml` |
 
@@ -141,8 +140,7 @@ All options are under `services.kanata`.
 | `kanata-bar.enable` | bool | `false` | Enable kanata-bar GUI launcher |
 | `kanata-bar.package` | package | fetched from GitHub Releases | The kanata-bar .app package |
 | `kanata-bar.autostart` | bool | `true` | Create launchd agent for auto-start at login |
-| `kanata-bar.smapp` | bool | `true` | Use SMAppService for Login Items integration (proper icon in System Settings) |
-| `kanata-bar.extraLaunchdConfig` | attrs | `{}` | Extra launchd plist attributes, applied in both smapp and legacy modes |
+| `kanata-bar.extraLaunchdConfig` | attrs | `{}` | Extra launchd plist attributes for the agent |
 | `kanata-bar.settings` | TOML attrs | `{}` | Settings merged into `config.toml` |
 | `kanata-bar.icons` | attrsOf path | `{}` | Layer icon files (use `mkLayerIcons` to generate) |
 
@@ -150,15 +148,23 @@ All options are under `services.kanata`.
 
 | Mode | sudoers | How it works |
 |---|---|---|
-| `kanata-bar` | `false` (recommended) | kanata-bar handles privilege escalation via TouchID/password (pam_touchid) |
-| `kanata-bar` | `true` | kanata-bar uses sudo NOPASSWD for kanata |
+| `kanata-bar` | `false` (recommended) | TouchID/password each start via `pam_touchid` — no sudoers rule, no standing privilege; the safe default |
+| `kanata-bar` | `true` (advanced) | **Prompt-free Start** — a sudo `sha256:` digest rule pins the bundled no-args `kanata-bar-supervise` (the yabai `--load-sa` pattern); the grant is scoped to that one hash-pinned command, not broad root. Falls back to the prompt if the rule/binary isn't present |
 | `kanata-tray` | `true` (recommended) | kanata-tray launches kanata via sudo NOPASSWD wrapper |
 | `kanata-tray` | `false` | Prompts for TouchID/password on start; password dialog on stop |
 | `daemon` | `true` (default) | Headless user launchd agent via sudo NOPASSWD; one-time TCC dialog |
 | `daemon` | `false` | Root launchd daemon with TCC sqlite3 hack (fragile, not recommended) |
 
+> [!NOTE]
+> **Recommended for kanata-bar:** TouchID PAM (`sudoers = false` + `pam_touchid`) is
+> the safe default — no sudoers rule, no standing privilege. `sudoers = true` is an
+> advanced, prompt-free opt-in that is only safe **through this module's digest rule**;
+> don't hand-roll a `NOPASSWD` rule yourself (a broad `/bin/sh`, or a bare `kanata`
+> that accepts `-c`, is unrestricted root — kanata's `cmd` actions then run anything
+> as root). This matters because kanata-bar is also used **without** this flake.
+
 > [!CAUTION]
-> `daemon` + `sudoers = false` uses a sqlite3 hack to write directly to the macOS TCC database for Input Monitoring permission. Apple may change the TCC.db schema in future macOS updates, which would silently break kanata or corrupt the database. Prefer `sudoers = true` or use kanata-bar/kanata-tray instead.
+> `daemon` + `sudoers = false` uses a sqlite3 hack to write directly to the macOS TCC database for Input Monitoring permission. Apple may change the TCC.db schema in future macOS updates, which would silently break kanata or corrupt the database — and it likely fails at full SIP without Full Disk Access for the writing process. Prefer `sudoers = true` or use kanata-bar/kanata-tray instead. (Removal candidate — see the kanata-bar wiki, task 19.)
 
 ## Layer icons
 
@@ -206,17 +212,22 @@ Click **"Open System Settings"** to navigate to the driver extension activation 
 
 ## Troubleshooting
 
-### Input Monitoring permission not requested
+### Accessibility permission not requested
 
-If kanata-bar or kanata-tray doesn't prompt for Input Monitoring after a fresh install, a stale TCC entry from a previous installation (e.g. Homebrew cask) may be blocking the dialog. macOS identifies apps by bundle identifier, so reinstalling via a different method reuses the old TCC record.
+On modern macOS kanata needs only **Accessibility** (it covers input capture — Input
+Monitoring is not required). If kanata-bar doesn't prompt for Accessibility after a
+fresh install, a stale TCC entry from a previous installation (e.g. a Homebrew cask)
+may be blocking the dialog — macOS keys TCC by bundle identifier, so reinstalling via a
+different method reuses the old record. (kanata-bar auto-resets its own grant when the
+install source changes, so this mostly bites across install methods.)
 
-Reset the entry to trigger the permission dialog again:
+Reset the entry to trigger the dialog again:
 
 ```bash
-tccutil reset ListenEvent com.kanata-bar
+tccutil reset Accessibility com.kanata-bar
 ```
 
-Or manually: **System Settings > Privacy & Security > Input Monitoring** — find Kanata Bar, remove it, then relaunch the app.
+Or manually: **System Settings > Privacy & Security > Accessibility** — find Kanata Bar, remove it, then relaunch the app.
 
 ## Tips
 
