@@ -148,9 +148,20 @@ in
         };
       };
 
-      # sudoers NOPASSWD entry for kanata and pkill
-      security.sudo.extraConfig = lib.mkIf (cfg.sudoers && enabledCount > 0)
-        "${user} ALL=(root) NOPASSWD: ${cfg.package}/bin/kanata, /usr/bin/pkill -x kanata";
+      # sudoers NOPASSWD entries.
+      #   • pkill: every mode uses it (kanata-bar's killLeftoverKanata, tray, daemon).
+      #   • kanata binary: daemon & tray launch `sudo ${cfg.package}/bin/kanata`
+      #     directly and need this pin. kanata-bar does NOT — it uses the
+      #     digest-pinned `kanata-bar-supervise` rule written at activation (see
+      #     modules/kanata-bar.nix, task 18 / option 2b), so the broad `kanata`
+      #     pin (any args, incl. a crafted `-c`) is omitted in kanata-bar mode.
+      security.sudo.extraConfig = lib.mkIf (cfg.sudoers && enabledCount > 0) (
+        lib.concatStringsSep "\n" (
+          lib.optional (cfg.daemon.enable || cfg.kanata-tray.enable)
+            "${user} ALL=(root) NOPASSWD: ${cfg.package}/bin/kanata"
+          ++ [ "${user} ALL=(root) NOPASSWD: /usr/bin/pkill -x kanata" ]
+        )
+      );
     })
   ];
 }
