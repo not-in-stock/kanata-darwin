@@ -163,8 +163,8 @@ All options are under `services.kanata`.
 > that accepts `-c`, is unrestricted root — kanata's `cmd` actions then run anything
 > as root). This matters because kanata-bar is also used **without** this flake.
 
-> [!CAUTION]
-> `daemon` + `sudoers = false` uses a sqlite3 hack to write directly to the macOS TCC database for Input Monitoring permission. Apple may change the TCC.db schema in future macOS updates, which would silently break kanata or corrupt the database — and it likely fails at full SIP without Full Disk Access for the writing process. Prefer `sudoers = true` or use kanata-bar/kanata-tray instead. (Removal candidate — see the kanata-bar wiki, task 19.)
+> [!WARNING]
+> **Deprecated.** `daemon` + `sudoers = false` writes to the macOS TCC database via a sqlite3 hack — fragile, likely already a no-op at full SIP, and slated for removal in a future release. Use `sudoers = true` (default), or kanata-bar/kanata-tray.
 
 ## Layer icons
 

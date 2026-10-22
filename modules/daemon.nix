@@ -27,10 +27,9 @@ in
 
   config = lib.mkIf (cfg.enable && cfg.daemon.enable) {
     warnings = lib.optional useTccHack ''
-      services.kanata: running in daemon mode with sudoers=false uses a fragile TCC sqlite3 hack
-      to grant Input Monitoring permission. Apple may change the TCC.db schema in future macOS
-      updates, which would silently break kanata — or worse, corrupt the TCC database.
-      Consider using sudoers=true (default) or kanata-bar/kanata-tray instead.
+      services.kanata: daemon + sudoers=false uses a TCC.db sqlite3 hack that is DEPRECATED and
+      will be removed in a future release (it is likely already a no-op at full SIP). Switch to
+      sudoers=true (default), or use kanata-bar/kanata-tray.
     '';
 
     system.activationScripts.postActivation.text = lib.mkAfter (
